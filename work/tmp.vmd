@@ -1,0 +1,8 @@
+source /Users/yangjunjie/work/bs-uhf/src/util.vmd; show_mol /Users/yangjunjie/work/bs-uhf/data/h4/cub//h4_mo_beta_3_0.3318.cube
+drawarrow "serial 1"  0.0000  0.0000  0.4827 2.0 0.05
+drawarrow "serial 2"  0.0000  0.0000 -0.4827 2.0 0.05
+drawarrow "serial 3"  0.0000  0.0000 -0.4827 2.0 0.05
+drawarrow "serial 4"  0.0000  0.0000  0.4827 2.0 0.05
+rotate x by -20.0000
+display height 30
+render TachyonInternal test.png
