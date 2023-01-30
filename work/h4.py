@@ -22,11 +22,11 @@ def get_ghf_fci_ham(ghf_obj, coeff_ghf, nelec):
     h1e = reduce(numpy.dot, (coeff_ghf.T, ghf_obj.get_hcore(), coeff_ghf))
 
     coeff_alph = coeff_ghf[:nao, :]
-    coeff_beta = coeff_ghf[nao:, :]
-    h2e_aabb = ao2mo.kernel(ghf_obj._eri, (coeff_alph, coeff_alph, coeff_beta, coeff_beta))
+    coeff_uhf_beta = coeff_ghf[nao:, :]
+    h2e_aabb = ao2mo.kernel(ghf_obj._eri, (coeff_alph, coeff_alph, coeff_uhf_beta, coeff_uhf_beta))
 
     h2e  = ao2mo.kernel(ghf_obj._eri, coeff_alph)
-    h2e += ao2mo.kernel(ghf_obj._eri, coeff_beta)
+    h2e += ao2mo.kernel(ghf_obj._eri, coeff_uhf_beta)
     h2e += h2e_aabb + h2e_aabb.T
 
     return h1e, h2e, absorb_h1e(h1e, h2e, norb, nelec, 0.5)
@@ -87,11 +87,6 @@ def solve_h4_bs_uhf(r, basis="sto-3g", f=None):
     gmp_obj.verbose = 0
 
     ovlp_ao = ghf_obj.get_ovlp()
-    s_uhf    = get_spin_avg(rdm1_ghf=rdm1_uhf, ovlp_ao=ovlp_ao, ao_idx=[0]).real
-    vfci_uhf = numpy.zeros((ndet, 1))
-    vfci_uhf[0, 0] = 1
-    u = reduce(numpy.dot, [coeff_uhf.T, ovlp_ao, coeff_rhf])
-    vfci_uhf = addons.transform_ci_for_orbital_rotation(vfci_uhf, norb_alph + norb_beta, (nelec_alph + nelec_beta, 0), u)
 
     from pyscf.ci.cisd import tn_addrs_signs
     t2addr, t2sign = tn_addrs_signs(norb_alph + norb_beta, nelec_alph + nelec_beta, 2)
@@ -106,19 +101,19 @@ def solve_h4_bs_uhf(r, basis="sto-3g", f=None):
         # rot_matrix = reduce(numpy.dot, [rot_matrix_2, rot_matrix_3])
         # s_uhf_rot = numpy.dot(rot_matrix, s_uhf)
 
-        coeff_beta = rotate_coeff_ghf(coeff_uhf, beta=beta).real
-        rdm1_beta  = ghf_obj.make_rdm1(coeff_beta, mo_occ_uhf)
+        coeff_uhf_beta = rotate_coeff_ghf(coeff_uhf, beta=beta).real
+        rdm1_uhf_beta  = ghf_obj.make_rdm1(coeff_uhf_beta, mo_occ_uhf)
 
-        ene_mp2, t2 = gmp_obj.kernel(mo_coeff=coeff_beta)
-        ene_mp2 += ene_uhf
+        ene_mp2, t2 = gmp_obj.kernel(mo_coeff=coeff_uhf_beta)
+        ene_mp2    += ene_uhf
 
-        err = ghf_obj.get_grad(coeff_beta, mo_occ_uhf)
+        err = ghf_obj.get_grad(coeff_uhf_beta, mo_occ_uhf)
         err = numpy.linalg.norm(err)
         assert err < 1e-6
 
-        u = reduce(numpy.dot, [coeff_beta.conj().T, ovlp_ao, coeff_rhf])
-        coeff_beta_ = reduce(numpy.dot, [coeff_rhf, u.T])
-        assert numpy.linalg.norm(coeff_beta - coeff_beta_) < 1e-8
+        u = reduce(numpy.dot, [coeff_uhf_beta.conj().T, ovlp_ao, coeff_rhf])
+        coeff_uhf_beta_ = reduce(numpy.dot, [coeff_rhf, u.T])
+        assert numpy.linalg.norm(coeff_uhf_beta - _) < 1e-8
 
         vfci_uhf_beta = numpy.zeros((ndet, 1))
         vfci_uhf_beta[0, 0] = 1.0
