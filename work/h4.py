@@ -32,6 +32,7 @@ def get_ghf_fci_ham(ghf_obj, coeff_ghf, nelec):
     return h1e, h2e, absorb_h1e(h1e, h2e, norb, nelec, 0.5)
 
 def solve_h4_bs_uhf(r, basis="sto-3g", f=None):
+    atoms = ""
     mol = gto.Mole()
     mol.atom = f"""
     H1 { r/2.0: 12.8f} { r/2.0: 12.8f} 0.00000
@@ -134,76 +135,6 @@ def solve_h4_bs_uhf(r, basis="sto-3g", f=None):
         vfci_mp2_beta = addons.transform_ci_for_orbital_rotation(vfci_mp2_beta, norb_alph + norb_beta, (nelec_alph + nelec_beta, 0), u)
         vfci_mp2_list.append(vfci_mp2_beta)
 
-    # vfci_uhf_perm_list = []
-
-    # nao = mol.nao_nr()
-    # orb_1 = rhf_obj.mo_coeff[:, 0]
-    # orb_2 = rhf_obj.mo_coeff[:, 1]
-    # orb_3 = rhf_obj.mo_coeff[:, 2]
-    # orb_4 = rhf_obj.mo_coeff[:, 3]
-
-    # for spin_1 in range(2):
-    #     for spin_2 in range(2):
-    #         for spin_3 in range(2):
-    #             for spin_4 in range(2):
-    #                 if (spin_1 + spin_2 + spin_3 + spin_4) == 2:
-    #                     coeff_uhf_perm = coeff_rhf.copy()
-    #                     coeff_uhf_perm[:, :4] *= 0.0
-                        
-    #                     if spin_1 == 0:
-    #                         coeff_uhf_perm[:nao, 0] = orb_1[:]
-    #                     else:
-    #                         coeff_uhf_perm[nao:, 0] = orb_1[:]
-
-    #                     if spin_2 == 0:
-    #                         coeff_uhf_perm[:nao, 1] = orb_1[:]
-    #                     else:
-    #                         coeff_uhf_perm[nao:, 1] = orb_1[:]
-                        
-    #                     if spin_3 == 0:
-    #                         coeff_uhf_perm[:nao, 2] = orb_2[:]
-    #                     else:
-    #                         coeff_uhf_perm[nao:, 2] = orb_2[:]
-
-    #                     if spin_4 == 0:
-    #                         coeff_uhf_perm[:nao, 3] = orb_2[:]
-    #                     else:
-    #                         coeff_uhf_perm[nao:, 3] = orb_2[:]
-
-    #                     oo = reduce(numpy.dot, [coeff_uhf_perm.conj().T, ovlp_ao, coeff_uhf_perm])
-    #                     dump_rec(stdout, coeff_uhf_perm)
-    #                     dump_rec(stdout, oo)
-    #                     assert 1 == 2
-
-
-    #                     err = ghf_obj.get_grad(coeff_uhf_perm, mo_occ_uhf)
-    #                     err = numpy.linalg.norm(err)
-    #                     assert err < 1e-6
-
-    #                     u = reduce(numpy.dot, [coeff_rhf.T, ovlp_ao, coeff_uhf_perm.conj()])
-    #                     coeff_uhf_perm_ = reduce(numpy.dot, [coeff_rhf, u])
-    #                     assert numpy.linalg.norm(coeff_uhf_perm - coeff_uhf_perm_) < 1e-8
-
-    #                     vfci_uhf_perm = numpy.zeros((ndet, 1))
-    #                     vfci_uhf_perm[0, 0] = 1.0
-
-    #                     vfci_uhf_perm = addons.transform_ci_for_orbital_rotation(vfci_uhf_perm, norb_alph + norb_beta, (nelec_alph + nelec_beta, 0), u)
-
-    #                     vfci_uhf_perm_list.append(vfci_uhf_perm)
-
-    # vfci_uhf_perm_list = numpy.asarray(vfci_uhf_perm_list)
-    # v_dot_v  = numpy.einsum("Imn,Jmn->IJ", vfci_uhf_perm_list.conj(), vfci_uhf_perm_list)
-    # dump_rec(stdout, v_dot_v)
-
-    # e, c = numpy.linalg.eigh(v_dot_v)
-    # print(e)
-
-    # cs = c[:, abs(e.real) > 1e-8]
-    # v_dot_v_  = reduce(numpy.dot, [cs.conj().T, v_dot_v, cs])
-    
-    # assert 1 == 2
-
-
     h1e, h2e, ham = get_ghf_fci_ham(ghf_obj, coeff_rhf, (nelec_alph + nelec_beta, 0))
     ene_fci, vfci = fci.direct_spin1.kernel(h1e, h2e, norb_alph + norb_beta, (nelec_alph + nelec_beta, 0))
 
@@ -227,9 +158,15 @@ def solve_h4_bs_uhf(r, basis="sto-3g", f=None):
 
         e, c = numpy.linalg.eig(v_dot_v)
 
-        cs = c[:, abs(e.real) > 1e-8]
+        mask = abs(e.real) > 1e-8
+        print(mask)
+        cs = c[:, mask]
+
         v_dot_v_  = reduce(numpy.dot, [cs.conj().T, v_dot_v, cs])
         v_dot_hv_ = reduce(numpy.dot, [cs.conj().T, v_dot_hv, cs])
+
+        print(v_dot_v_)
+        print(v_dot_hv_)
 
         ene_noci = scipy.linalg.eig(v_dot_hv_, v_dot_v_)[0].real
         data_dict[f"NOCI-{iv}"] = ene_noci[0]
@@ -243,6 +180,6 @@ if __name__ == "__main__":
     basis = "sto3g"
     with open(f"/Users/yangjunjie/work/bs-uhf/data/h4/bs-uhf-{basis}.csv", "w") as f:
         for x in numpy.linspace(0.4, 3.2, 41):
-            # if abs(x - 1.4) < 1e-1: break
-            solve_h4_bs_uhf(x, basis=basis, f=f)
+            if abs(x - 1.4) < 1e-1: # break
+                solve_h4_bs_uhf(x, basis=basis, f=f)
                 

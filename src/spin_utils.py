@@ -132,7 +132,7 @@ def coeff_gso_to_ghf(coeff_gso):
     coeff_ghf = numpy.array(coeff_ghf).reshape((2*nao, norb))
     return coeff_ghf
 
-def rotate_coeff_gso(coeff_gso, alpha=0.0, beta=0.0, gamma=0.0):
+def rotate_coeff_gso(coeff_gso, alpha=0.0, beta=0.0, gamma=0.0, imag_tol=1e-8):
     pauli_matrix_y = 0.5 * numpy.array([[0.0, -1.0j], [1.0j, 0.0]])
     pauli_matrix_z = 0.5 * numpy.array([[1.0,   0.0], [0.0, -1.0]])
 
@@ -141,7 +141,10 @@ def rotate_coeff_gso(coeff_gso, alpha=0.0, beta=0.0, gamma=0.0):
     rot_matrix_3 = scipy.linalg.expm(-1.0j * gamma * pauli_matrix_z)
 
     rot_matrix = functools.reduce(numpy.dot, (rot_matrix_1, rot_matrix_2, rot_matrix_3))
-    return numpy.einsum("ab,bnp->anp", rot_matrix, coeff_gso)
+    coeff_gso_rot = numpy.einsum("ab,bnp->anp", rot_matrix, coeff_gso)
+    assert numpy.linalg.norm(coeff_gso_rot.imag) < imag_tol
+
+    return coeff_gso_rot.real
 
 def rotate_coeff_ghf(coeff_ghf, alpha=0.0, beta=0.0, gamma=0.0):
     coeff_gso = coeff_ghf_to_gso(coeff_ghf)
