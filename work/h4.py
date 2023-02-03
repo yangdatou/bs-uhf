@@ -121,6 +121,10 @@ def solve_h4_bs_uhf(r, basis="sto-3g"):
         alph_idx = list(alph_idx)
         ss_idx   = [0 if i not in alph_idx else 1 for i in range(nelec_alph + nelec_beta)]
         s1, s2, s3, s4 = ss_idx
+
+        if s1 == s2 and s3 == s4:
+            continue
+
         dm0 = numpy.zeros((2, mol.nao, mol.nao))
         dm0[s1, 0, 0] = 1.0
         dm0[s2, 1, 1] = 1.0
@@ -156,22 +160,22 @@ def solve_h4_bs_uhf(r, basis="sto-3g"):
     vfci_list  = [vfci_uhf_list, vfci_ump2_list]
     hvfci_list = [hvfci_uhf_list, hvfci_ump2_list]
 
-    for iv, v in enumerate([vfci_uhf_list, vfci_ump2]):
+    for iv, v in enumerate(zip(ene_list, hvfci_list)):
         pass
 
-    vfci_uhf_list = numpy.asarray(vfci_uhf_list)
-    v_dot_v  = numpy.einsum("Iij,Jij->IJ", vfci_uhf_list, vfci_uhf_list)
-    v_dot_hv = numpy.einsum("Iij,Jij->IJ", vfci_uhf_list, hvfci_uhf_list)
-    
-    h_diag  = numpy.diag(v_dot_hv)
-    ene_uhf = numpy.asarray(ene_uhf_list)
-    assert numpy.linalg.norm(h_diag - ene_uhf) < 1e-8
+        vfci_uhf_list = numpy.asarray(vfci_uhf_list)
+        v_dot_v  = numpy.einsum("Iij,Jij->IJ", vfci_uhf_list, vfci_uhf_list)
+        v_dot_hv = numpy.einsum("Iij,Jij->IJ", vfci_uhf_list, hvfci_uhf_list)
+        
+        h_diag  = numpy.diag(v_dot_hv)
+        ene_uhf = numpy.asarray(ene_uhf_list)
+        assert numpy.linalg.norm(h_diag - ene_uhf) < 1e-8
 
-    eigval, eigvec = scipy.linalg.eigh(v_dot_v)
-    mask = numpy.abs(eigval) > 1e-12
-    h    = reduce(numpy.dot, (eigvec[:, mask].conj().T, v_dot_hv, eigvec[:, mask]))
-    s    = reduce(numpy.dot, (eigvec[:, mask].conj().T, v_dot_v,  eigvec[:, mask]))
-    ene_noci, vec_noci = scipy.linalg.eigh(h ,s)
+        eigval, eigvec = scipy.linalg.eigh(v_dot_v)
+        mask = numpy.abs(eigval) > 1e-12
+        h    = reduce(numpy.dot, (eigvec[:, mask].conj().T, v_dot_hv, eigvec[:, mask]))
+        s    = reduce(numpy.dot, (eigvec[:, mask].conj().T, v_dot_v,  eigvec[:, mask]))
+        ene_noci, vec_noci = scipy.linalg.eigh(h ,s)
 
     tmp  = "r = %10.6f, " % r
     tmp += "".join(["%12.4e, " % i for i in eigval])[:-1]
