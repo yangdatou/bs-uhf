@@ -1,35 +1,66 @@
+import itertools
 from functools import reduce
+
 import os, sys, numpy, scipy
 from sys import stdout
 from numpy import linalg
 
 from pyscf import gto, scf, fci, mp, ao2mo, ci
+from pyscf.fci import cistring, spin_op, addons
 from pyscf.fci.direct_spin1 import absorb_h1e, contract_2e
 from pyscf.tools.dump_mat import dump_rec
 from pyscf.fci import cistring, spin_op
+from pyscf.lib import chkfile
+from pyscf.ci  import ucisd
 
 from spin_utils import coeff_rhf_to_ghf, coeff_uhf_to_ghf
 from spin_utils import rotate_coeff_ghf, get_spin_avg
 
-def get_ghf_fci_ham(ghf_obj, coeff_ghf, nelec):
-    hcore = ghf_obj.get_hcore()
-    nao   = hcore.shape[0] // 2
-    norb  = coeff_ghf.shape[1]
+def proj_uhf_to_fci_vec(coeff_rhf, coeff_uhf, nelec=None, ovlp_ao=None):
+    nao, norb = coeff_rhf.shape
+    coeff_uhf = numpy.asarray(coeff_uhf)
+    nelec_alph, nelec_beta = nelec
+    
+    assert coeff_rhf.shape == (nao, norb)
+    assert coeff_uhf.shape == (2, nao, norb)
+    assert ovlp_ao.shape   == (nao, nao)
 
-    assert hcore.shape == (nao * 2, nao * 2)
-    assert coeff_ghf.shape == (nao * 2, norb)
+    ovlp_rhf_uhf = numpy.einsum("smp,nq,mn->spq", coeff_uhf, coeff_rhf, ovlp_ao)
 
-    h1e = reduce(numpy.dot, (coeff_ghf.T, ghf_obj.get_hcore(), coeff_ghf))
+    na = cistring.num_strings(norb, nelec_alph)
+    nb = cistring.num_strings(norb, nelec_beta)
+    vec_fci = numpy.zeros((na, nb))
+    vec_fci[0, 0] = 1.0
 
-    coeff_alph = coeff_ghf[:nao, :]
-    coeff_uhf_beta = coeff_ghf[nao:, :]
-    h2e_aabb = ao2mo.kernel(ghf_obj._eri, (coeff_alph, coeff_alph, coeff_uhf_beta, coeff_uhf_beta))
+    return addons.transform_ci_for_orbital_rotation(vec_fci, norb, nelec, ovlp_rhf_uhf)
 
-    h2e  = ao2mo.kernel(ghf_obj._eri, coeff_alph)
-    h2e += ao2mo.kernel(ghf_obj._eri, coeff_uhf_beta)
-    h2e += h2e_aabb + h2e_aabb.T
+def proj_ump2_to_fci_vec(coeff_rhf, coeff_uhf, t0=None, t1=None, t2=None, 
+                         nelec=None, ovlp_ao=None):
 
-    return h1e, h2e, absorb_h1e(h1e, h2e, norb, nelec, 0.5)
+    nao, norb = coeff_rhf.shape
+    coeff_uhf = numpy.asarray(coeff_uhf)
+    nelec_alph, nelec_beta = nelec
+    
+    assert coeff_rhf.shape == (nao, norb)
+    assert coeff_uhf.shape == (2, nao, norb)
+    assert ovlp_ao.shape   == (nao, nao)
+
+    nocc_a = nelec_alph
+    nocc_b = nelec_beta
+    nvir_a = norb - nocc_a
+    nvir_b = norb - nocc_b
+
+    if t0 is None:
+        t0 = 1.0
+
+    if t1 is None:
+        t1_a = numpy.zeros((nocc_a, nvir_a))
+        t1_b = numpy.zeros((nocc_b, nvir_b))
+
+    ovlp_rhf_uhf = numpy.einsum("smp,nq,mn->spq", coeff_uhf, coeff_rhf, ovlp_ao)
+    vec_cisd = ucisd.amplitudes_to_cisdvec(t0, (t1_a, t1_b), t2)
+    vec_fci  = ucisd.to_fcivec(vec_cisd, norb, nelec)
+    return addons.transform_ci_for_orbital_rotation(vec_fci, norb, nelec, ovlp_rhf_uhf)
 
 def solve_h4_bs_uhf(r, basis="sto-3g"):
     atoms  = ""
@@ -46,130 +77,110 @@ def solve_h4_bs_uhf(r, basis="sto-3g"):
     rhf_obj = scf.RHF(mol)
     rhf_obj.verbose = 0
     rhf_obj.conv_tol = 1e-12
-    mo_energy, mo_coeff = rhf_obj.eig(hcore, ovlp_ao)
-    coeff_rhf = coeff_rhf_to_ghf(mo_coeff, mo_energy)
-    ene_rhf   = rhf_obj.energy_elec()[0]
+    rhf_obj.kernel()
+    assert rhf_obj.converged
 
-    dm0 = numpy.zeros((2, mol.nao, mol.nao))
-    dm0[0, 0, 0] = 1.0
-    dm0[0, 3, 3] = 1.0
-    dm0[1, 1, 1] = 1.0
-    dm0[1, 2, 2] = 1.0
+    ene_rhf   = rhf_obj.energy_elec()[0]
+    coeff_rhf = rhf_obj.mo_coeff
+    ovlp_ao   = rhf_obj.get_ovlp()
+
+    fci_obj = fci.FCI(mol, mo=rhf_obj.mo_coeff, singlet=False)
+    fci_obj.verbose = 0
+    ene_fci = fci_obj.kernel()[0] - mol.energy_nuc()
+
+    vfci_uhf_list   = []
+    hvfci_uhf_list  = []
+    hvfci_ump2_list = []
+    ene_uhf_list    = []
+    ene_ump2_list   = []
+
+    norb = coeff_rhf.shape[1]
+    nelec_alph, nelec_beta = mol.nelec[0], mol.nelec[1]
+    nelec = (nelec_alph, nelec_beta)
+    spin_list  = [0 for i in range(nelec_alph)]
+    spin_list += [1 for i in range(nelec_beta)]
+
+    from pyscf.fci.direct_spin1 import absorb_h1e, contract_2e
+    h1e = reduce(numpy.dot, (coeff_rhf.conj().T, rhf_obj.get_hcore(), coeff_rhf))
+    h2e = ao2mo.kernel(rhf_obj._eri, coeff_rhf)
+    ham = absorb_h1e(h1e, h2e, norb, nelec, 0.5)
+
+    data_dict = {
+        "RHF" : ene_rhf, "FCI" : ene_fci,
+        "r": r, "ene_nuc": mol.energy_nuc(),
+    }
 
     uhf_obj = scf.UHF(mol)
     uhf_obj.verbose = 0
-    uhf_obj.conv_tol = 1e-12
-    uhf_obj.kernel(dm0=dm0)
-    assert uhf_obj.converged
-    ene_uhf = uhf_obj.energy_elec()[0]
-    dm_uhf = uhf_obj.make_rdm1()
-    coeff_uhf, mo_occ_uhf = coeff_uhf_to_ghf(uhf_obj.mo_coeff, uhf_obj.mo_energy, uhf_obj.mo_occ)
+    uhf_obj.max_cycle = 1200
+    uhf_obj.conv_tol = 1e-8
+    uhf_obj.diis_start_cycle = 20
+    uhf_obj.diis_space = 10
 
-    from pyscf.fci import cistring, addons
-    norb_alph, norb_beta   = uhf_obj.mo_coeff[0].shape[1], uhf_obj.mo_coeff[1].shape[1]
-    nelec_alph, nelec_beta = uhf_obj.nelec[0], uhf_obj.nelec[1]
-    ndet     = cistring.num_strings(norb_alph + norb_beta, nelec_alph + nelec_beta)
-    vfci_rhf = numpy.zeros((ndet, 1))
-    vfci_rhf[0, 0] = 1
+    for iidx, alph_idx in enumerate(itertools.combinations(range(nelec_alph + nelec_beta), nelec_alph)):
+        alph_idx = list(alph_idx)
+        ss_idx   = [0 if i not in alph_idx else 1 for i in range(nelec_alph + nelec_beta)]
+        s1, s2, s3, s4 = ss_idx
+        dm0 = numpy.zeros((2, mol.nao, mol.nao))
+        dm0[s1, 0, 0] = 1.0
+        dm0[s2, 1, 1] = 1.0
+        dm0[s3, 2, 2] = 1.0
+        dm0[s4, 3, 3] = 1.0
 
-    vfci_uhf_list = []
-    vfci_mp2_list = []
+        uhf_obj.kernel(dm0=dm0)
+        assert uhf_obj.converged
 
-    ghf_obj = scf.GHF(mol)
-    ghf_obj.verbose = 0
-    rdm1_uhf = ghf_obj.make_rdm1(coeff_uhf, mo_occ_uhf)
-    ghf_obj.kernel(dm0=rdm1_uhf)
-    assert ghf_obj.converged
-    ene_ghf = ghf_obj.energy_elec()[0]
-    
-    gmp_obj = mp.GMP2(ghf_obj)
-    gmp_obj.verbose = 0
+        coeff_uhf = uhf_obj.mo_coeff
+        ene_uhf   = uhf_obj.energy_elec()[0]
 
-    ovlp_ao = ghf_obj.get_ovlp()
+        ump2_obj = mp.UMP2(uhf_obj)
+        ump2_obj.verbose = 0
+        ene_ump2, t2_ump2 = ump2_obj.kernel(mo_coeff=coeff_uhf)
+        ene_ump2 += ene_uhf
 
-    from pyscf.ci.cisd import tn_addrs_signs
-    t2addr, t2sign = tn_addrs_signs(norb_alph + norb_beta, nelec_alph + nelec_beta, 2)
+        vfci_uhf  = proj_uhf_to_fci_vec(coeff_rhf, coeff_uhf, nelec, ovlp_ao)
+        vfci_ump2 = proj_ump2_to_fci_vec(coeff_rhf, coeff_uhf, nelec=nelec, ovlp_ao=ovlp_ao, t2=t2_ump2)
 
-    for alpha in numpy.linspace(0.0, numpy.pi, 11):
-        for beta in numpy.linspace(0.0, numpy.pi, 11):
-            coeff_uhf_beta = rotate_coeff_ghf(coeff_uhf, alpha=alpha, beta=beta)
-            rdm1_uhf_beta  = ghf_obj.make_rdm1(coeff_uhf_beta, mo_occ_uhf)
+        hvfci_uhf  = contract_2e(ham, vfci_uhf,  norb, nelec)
+        hvfci_ump2 = contract_2e(ham, vfci_ump2, norb, nelec)
 
-            ene_mp2, t2 = gmp_obj.kernel(mo_coeff=coeff_uhf_beta)
-            ene_mp2    += ene_uhf
+        data_dict["UHF-%d" % iidx]  = ene_uhf
+        data_dict["UMP2-%d" % iidx] = ene_ump2
 
-            err = ghf_obj.get_grad(coeff_uhf_beta, mo_occ_uhf)
-            err = numpy.linalg.norm(err)
-            assert err < 1e-6
+        vfci_uhf_list.append(vfci_uhf)
+        hvfci_uhf_list.append(hvfci_uhf)
+        ene_uhf_list.append(ene_uhf)
+        ene_ump2_list.append(ene_ump2)
 
-            u = reduce(numpy.dot, [coeff_uhf_beta.conj().T, ovlp_ao, coeff_rhf])
-            coeff_uhf_beta_ = reduce(numpy.dot, [coeff_rhf, u.T])
-            assert numpy.linalg.norm(coeff_uhf_beta - _) < 1e-8
+    ene_list   = [ene_uhf_list, ene_ump2_list]
+    vfci_list  = [vfci_uhf_list, vfci_ump2_list]
+    hvfci_list = [hvfci_uhf_list, hvfci_ump2_list]
 
-            vfci_uhf_beta = numpy.zeros((ndet, 1))
-            vfci_uhf_beta[0, 0] = 1.0
-
-            vfci_uhf_beta = addons.transform_ci_for_orbital_rotation(vfci_uhf_beta, norb_alph + norb_beta, (nelec_alph + nelec_beta, 0), u)
-            vfci_uhf_list.append(vfci_uhf_beta)
-
-            vfci_mp2_beta = numpy.zeros((ndet, 1))
-            vfci_mp2_beta[0, 0] = 1.0
-
-            nocc = 4
-            nvir = norb_alph + norb_beta - nocc
-            oo_idx = numpy.tril_indices(nocc, -1)
-            vv_idx = numpy.tril_indices(nvir, -1)
-            t2_ = t2[oo_idx][:, vv_idx[0], vv_idx[1]]
-            vfci_mp2_beta[t2addr, 0] = t2_.ravel() * t2sign
-            
-            vfci_mp2_beta = addons.transform_ci_for_orbital_rotation(vfci_mp2_beta, norb_alph + norb_beta, (nelec_alph + nelec_beta, 0), u)
-            vfci_mp2_list.append(vfci_mp2_beta)
-
-    h1e, h2e, ham = get_ghf_fci_ham(ghf_obj, coeff_rhf, (nelec_alph + nelec_beta, 0))
-    ene_fci, vfci = fci.direct_spin1.kernel(h1e, h2e, norb_alph + norb_beta, (nelec_alph + nelec_beta, 0))
-
-    data_dict = {
-        "r": r, "ene_nuc": mol.energy_nuc(),
-        "RHF": ene_rhf, 
-        "UHF": ene_uhf, 
-        "GHF": ene_ghf,
-        "FCI": ene_fci,
-        "MP2": ene_mp2,
-    }
+    for iv, v in enumerate([vfci_uhf_list, vfci_ump2])
 
     vfci_uhf_list = numpy.asarray(vfci_uhf_list)
-    vfci_mp2_list = numpy.asarray(vfci_mp2_list)
+    v_dot_v  = numpy.einsum("Iij,Jij->IJ", vfci_uhf_list, vfci_uhf_list)
+    v_dot_hv = numpy.einsum("Iij,Jij->IJ", vfci_uhf_list, hvfci_uhf_list)
+    
+    h_diag  = numpy.diag(v_dot_hv)
+    ene_uhf = numpy.asarray(ene_uhf_list)
+    assert numpy.linalg.norm(h_diag - ene_uhf) < 1e-8
 
-    h_dot_v       = [contract_2e(ham, v, norb_alph + norb_beta, (nelec_alph + nelec_beta, 0)) for v in vfci_mp2_list]
+    eigval, eigvec = scipy.linalg.eigh(v_dot_v)
+    mask = numpy.abs(eigval) > 1e-12
+    h    = reduce(numpy.dot, (eigvec[:, mask].conj().T, v_dot_hv, eigvec[:, mask]))
+    s    = reduce(numpy.dot, (eigvec[:, mask].conj().T, v_dot_v,  eigvec[:, mask]))
+    ene_noci, vec_noci = scipy.linalg.eigh(h ,s)
 
-    for iv, v_list in enumerate([vfci_uhf_list, vfci_mp2_list]):
-        v_dot_v  = numpy.einsum("Imn,Jmn->IJ", v_list.conj(), vfci_mp2_list)
-        v_dot_hv = numpy.einsum("Imn,Jmn->IJ", v_list.conj(), h_dot_v)
+    tmp  = "r = %10.6f, " % r
+    tmp += "".join(["%12.4e, " % i for i in eigval])[:-1]
+    print(tmp)
 
-        e, c = numpy.linalg.eig(v_dot_v)
-
-        mask = abs(e.real) > 1e-8
-        print(mask)
-        cs = c[:, mask]
-
-        v_dot_v_  = reduce(numpy.dot, [cs.conj().T, v_dot_v, cs])
-        v_dot_hv_ = reduce(numpy.dot, [cs.conj().T, v_dot_hv, cs])
-
-        print(v_dot_v_)
-        print(v_dot_hv_)
-
-        ene_noci = scipy.linalg.eig(v_dot_hv_, v_dot_v_)[0].real
-        data_dict[f"NOCI-{iv}"] = ene_noci[0]
-
-
-    from pyscf import lib
-    os.makedirs(f"/Users/yangjunjie/work/bs-uhf/data/h4", exist_ok=True)
-    lib.chkfile.save(f"/Users/yangjunjie/work/bs-uhf/data/h4/bs-uhf-{basis}.h5", f"{r}", data_dict)
+    data_dict["NOCI"] = ene_noci[0]
+    chkfile.save(f"/Users/yangjunjie/work/bs-uhf/data/h4/bs-uhf-{basis}.h5", f"{r}", data_dict)
 
 if __name__ == "__main__":
     basis = "sto3g"
     for x in numpy.linspace(0.4, 3.2, 41):
-        if abs(x - 1.4) < 1e-1: # break
-            solve_h4_bs_uhf(x, basis=basis)
-            break
+        solve_h4_bs_uhf(x, basis=basis)
                 
