@@ -5,7 +5,7 @@ import pyscf
 from pyscf import fci, lib
 from pyscf.fci import cistring
 
-def coeff_rhf_to_ghf(coeff_rhf, mo_energy_rhf = None):
+def coeff_rhf_to_ghf(coeff_rhf, mo_energy_rhf = None, mo_occ_rhf = None):
     coeff_alph = coeff_rhf
     coeff_beta = coeff_rhf
 
@@ -15,21 +15,27 @@ def coeff_rhf_to_ghf(coeff_rhf, mo_energy_rhf = None):
     assert coeff_alph.shape == (nao, norb_alph)
     assert coeff_beta.shape == (nao, norb_beta)
 
-    coeff_ghf = [numpy.hstack((coeff_alph, numpy.zeros((nao, norb_beta)))), 
-                 numpy.hstack((numpy.zeros((nao, norb_alph)), coeff_beta))]
-    coeff_ghf = numpy.vstack(coeff_ghf).reshape(nao * 2, norb_alph + norb_beta)
+    coeff_ghf  = [numpy.hstack((coeff_alph, numpy.zeros((nao, norb_beta)))), 
+                  numpy.hstack((numpy.zeros((nao, norb_alph)), coeff_beta))]
+    coeff_ghf  = numpy.vstack(coeff_ghf).reshape(nao * 2, norb_alph + norb_beta)
+    mo_occ_ghf = numpy.hstack((mo_occ_rhf, mo_occ_rhf))
+    orb_spin   = [0 for i in range(norb_alph)] + [1 for i in range(norb_beta)]
+    orb_spin   = numpy.array(orb_spin)
 
     if mo_energy_rhf is not None:
         mo_energy_alph = mo_energy_rhf
         mo_energy_beta = mo_energy_rhf
+
         assert mo_energy_alph.shape == (norb_alph,)
         assert mo_energy_beta.shape == (norb_beta,)
 
         mo_energy_ghf = numpy.hstack((mo_energy_alph, mo_energy_beta))
         mo_argsort    = numpy.argsort(mo_energy_ghf)
         coeff_ghf     = coeff_ghf[:, mo_argsort]
+        mo_occ_ghf    = mo_occ_ghf[mo_argsort]
+        orb_spin      = orb_spin[mo_argsort]
 
-    return coeff_ghf
+    return coeff_ghf, mo_occ_ghf, orb_spin
 
 def coeff_uhf_to_ghf(coeff_uhf, mo_energy_uhf = None, mo_occ_uhf = None):
     coeff_alph, coeff_beta = coeff_uhf
@@ -45,6 +51,8 @@ def coeff_uhf_to_ghf(coeff_uhf, mo_energy_uhf = None, mo_occ_uhf = None):
                   numpy.hstack((numpy.zeros((nao, norb_alph)), coeff_beta))]
     coeff_ghf  = numpy.vstack(coeff_ghf).reshape(nao * 2, norb_alph + norb_beta)
     mo_occ_ghf = numpy.hstack((mo_occ_uhf[0], mo_occ_uhf[1]))
+    orb_spin   = [0 for i in range(norb_alph)] + [1 for i in range(norb_beta)]
+    orb_spin   = numpy.array(orb_spin)
 
     if mo_energy_uhf is not None:
         mo_energy_alph, mo_energy_beta = mo_energy_uhf
@@ -56,8 +64,9 @@ def coeff_uhf_to_ghf(coeff_uhf, mo_energy_uhf = None, mo_occ_uhf = None):
         mo_argsort    = numpy.argsort(mo_energy_ghf)
         coeff_ghf     = coeff_ghf[:, mo_argsort]
         mo_occ_ghf    = mo_occ_ghf[mo_argsort]
+        orb_spin      = orb_spin[mo_argsort]
 
-    return coeff_ghf, mo_occ_ghf
+    return coeff_ghf, mo_occ_ghf, orb_spin
 
 def coeff_ghf_to_uhf(coeff_ghf, ovlp_ao=None):
     assert coeff_ghf.shape[0] % 2 == 0
@@ -142,9 +151,7 @@ def rotate_coeff_gso(coeff_gso, alpha=0.0, beta=0.0, gamma=0.0, imag_tol=1e-8):
 
     rot_matrix = functools.reduce(numpy.dot, (rot_matrix_1, rot_matrix_2, rot_matrix_3))
     coeff_gso_rot = numpy.einsum("ab,bnp->anp", rot_matrix, coeff_gso)
-    assert numpy.linalg.norm(coeff_gso_rot.imag) < imag_tol
-
-    return coeff_gso_rot.real
+    return coeff_gso_rot
 
 def rotate_coeff_ghf(coeff_ghf, alpha=0.0, beta=0.0, gamma=0.0):
     coeff_gso = coeff_ghf_to_gso(coeff_ghf)

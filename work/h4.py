@@ -31,23 +31,21 @@ def get_ghf_fci_ham(ghf_obj, coeff_ghf, nelec):
 
     return h1e, h2e, absorb_h1e(h1e, h2e, norb, nelec, 0.5)
 
-def solve_h4_bs_uhf(r, basis="sto-3g", f=None):
-    atoms = ""
+def solve_h4_bs_uhf(r, basis="sto-3g"):
+    atoms  = ""
+    atoms += "H 0.0000 0.0000 % 12.8f\n" % ( 3.0 * r / 2.0)
+    atoms += "H 0.0000 0.0000 % 12.8f\n" % (-3.0 * r / 2.0)
+    atoms += "H 0.0000 0.0000 % 12.8f\n" % ( r / 2.0)
+    atoms += "H 0.0000 0.0000 % 12.8f\n" % (-r / 2.0)
+
     mol = gto.Mole()
-    mol.atom = f"""
-    H1 { r/2.0: 12.8f} { r/2.0: 12.8f} 0.00000
-    H2 { r/2.0: 12.8f} {-r/2.0: 12.8f} 0.00000
-    H3 {-r/2.0: 12.8f} { r/2.0: 12.8f} 0.00000
-    H4 {-r/2.0: 12.8f} {-r/2.0: 12.8f} 0.00000
-    """
+    mol.atom  = atoms
     mol.basis = basis
     mol.build()
 
     rhf_obj = scf.RHF(mol)
     rhf_obj.verbose = 0
     rhf_obj.conv_tol = 1e-12
-    ovlp_ao = rhf_obj.get_ovlp()
-    hcore   = rhf_obj.get_hcore()
     mo_energy, mo_coeff = rhf_obj.eig(hcore, ovlp_ao)
     coeff_rhf = coeff_rhf_to_ghf(mo_coeff, mo_energy)
     ene_rhf   = rhf_obj.energy_elec()[0]
@@ -92,48 +90,40 @@ def solve_h4_bs_uhf(r, basis="sto-3g", f=None):
     from pyscf.ci.cisd import tn_addrs_signs
     t2addr, t2sign = tn_addrs_signs(norb_alph + norb_beta, nelec_alph + nelec_beta, 2)
 
-    for beta in numpy.linspace(0.0, numpy.pi, 11):
-        # l_matrix_y = numpy.array([[0.0,  0.0, 1.0], [0.0, 0.0, 0.0], [-1.0, 0.0, 0.0]])
-        # l_matrix_z = numpy.array([[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [ 0.0, 0.0, 0.0]])
+    for alpha in numpy.linspace(0.0, numpy.pi, 11):
+        for beta in numpy.linspace(0.0, numpy.pi, 11):
+            coeff_uhf_beta = rotate_coeff_ghf(coeff_uhf, alpha=alpha, beta=beta)
+            rdm1_uhf_beta  = ghf_obj.make_rdm1(coeff_uhf_beta, mo_occ_uhf)
 
-        # rot_matrix_2 = scipy.linalg.expm(beta  * l_matrix_y)
-        # rot_matrix_3 = scipy.linalg.expm(gamma * l_matrix_z)
+            ene_mp2, t2 = gmp_obj.kernel(mo_coeff=coeff_uhf_beta)
+            ene_mp2    += ene_uhf
 
-        # rot_matrix = reduce(numpy.dot, [rot_matrix_2, rot_matrix_3])
-        # s_uhf_rot = numpy.dot(rot_matrix, s_uhf)
+            err = ghf_obj.get_grad(coeff_uhf_beta, mo_occ_uhf)
+            err = numpy.linalg.norm(err)
+            assert err < 1e-6
 
-        coeff_uhf_beta = rotate_coeff_ghf(coeff_uhf, beta=beta).real
-        rdm1_uhf_beta  = ghf_obj.make_rdm1(coeff_uhf_beta, mo_occ_uhf)
+            u = reduce(numpy.dot, [coeff_uhf_beta.conj().T, ovlp_ao, coeff_rhf])
+            coeff_uhf_beta_ = reduce(numpy.dot, [coeff_rhf, u.T])
+            assert numpy.linalg.norm(coeff_uhf_beta - _) < 1e-8
 
-        ene_mp2, t2 = gmp_obj.kernel(mo_coeff=coeff_uhf_beta)
-        ene_mp2    += ene_uhf
+            vfci_uhf_beta = numpy.zeros((ndet, 1))
+            vfci_uhf_beta[0, 0] = 1.0
 
-        err = ghf_obj.get_grad(coeff_uhf_beta, mo_occ_uhf)
-        err = numpy.linalg.norm(err)
-        assert err < 1e-6
+            vfci_uhf_beta = addons.transform_ci_for_orbital_rotation(vfci_uhf_beta, norb_alph + norb_beta, (nelec_alph + nelec_beta, 0), u)
+            vfci_uhf_list.append(vfci_uhf_beta)
 
-        u = reduce(numpy.dot, [coeff_uhf_beta.conj().T, ovlp_ao, coeff_rhf])
-        coeff_uhf_beta_ = reduce(numpy.dot, [coeff_rhf, u.T])
-        assert numpy.linalg.norm(coeff_uhf_beta - _) < 1e-8
+            vfci_mp2_beta = numpy.zeros((ndet, 1))
+            vfci_mp2_beta[0, 0] = 1.0
 
-        vfci_uhf_beta = numpy.zeros((ndet, 1))
-        vfci_uhf_beta[0, 0] = 1.0
-
-        vfci_uhf_beta = addons.transform_ci_for_orbital_rotation(vfci_uhf_beta, norb_alph + norb_beta, (nelec_alph + nelec_beta, 0), u)
-        vfci_uhf_list.append(vfci_uhf_beta)
-
-        vfci_mp2_beta = numpy.zeros((ndet, 1))
-        vfci_mp2_beta[0, 0] = 1.0
-
-        nocc = 4
-        nvir = norb_alph + norb_beta - nocc
-        oo_idx = numpy.tril_indices(nocc, -1)
-        vv_idx = numpy.tril_indices(nvir, -1)
-        t2_ = t2[oo_idx][:, vv_idx[0], vv_idx[1]]
-        vfci_mp2_beta[t2addr, 0] = t2_.ravel() * t2sign
-        
-        vfci_mp2_beta = addons.transform_ci_for_orbital_rotation(vfci_mp2_beta, norb_alph + norb_beta, (nelec_alph + nelec_beta, 0), u)
-        vfci_mp2_list.append(vfci_mp2_beta)
+            nocc = 4
+            nvir = norb_alph + norb_beta - nocc
+            oo_idx = numpy.tril_indices(nocc, -1)
+            vv_idx = numpy.tril_indices(nvir, -1)
+            t2_ = t2[oo_idx][:, vv_idx[0], vv_idx[1]]
+            vfci_mp2_beta[t2addr, 0] = t2_.ravel() * t2sign
+            
+            vfci_mp2_beta = addons.transform_ci_for_orbital_rotation(vfci_mp2_beta, norb_alph + norb_beta, (nelec_alph + nelec_beta, 0), u)
+            vfci_mp2_list.append(vfci_mp2_beta)
 
     h1e, h2e, ham = get_ghf_fci_ham(ghf_obj, coeff_rhf, (nelec_alph + nelec_beta, 0))
     ene_fci, vfci = fci.direct_spin1.kernel(h1e, h2e, norb_alph + norb_beta, (nelec_alph + nelec_beta, 0))
@@ -178,8 +168,8 @@ def solve_h4_bs_uhf(r, basis="sto-3g", f=None):
 
 if __name__ == "__main__":
     basis = "sto3g"
-    with open(f"/Users/yangjunjie/work/bs-uhf/data/h4/bs-uhf-{basis}.csv", "w") as f:
-        for x in numpy.linspace(0.4, 3.2, 41):
-            if abs(x - 1.4) < 1e-1: # break
-                solve_h4_bs_uhf(x, basis=basis, f=f)
+    for x in numpy.linspace(0.4, 3.2, 41):
+        if abs(x - 1.4) < 1e-1: # break
+            solve_h4_bs_uhf(x, basis=basis)
+            break
                 
