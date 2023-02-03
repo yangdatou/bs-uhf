@@ -156,7 +156,8 @@ def solve_h4_bs_uhf(r, basis="sto-3g"):
     vfci_list  = [vfci_uhf_list, vfci_ump2_list]
     hvfci_list = [hvfci_uhf_list, hvfci_ump2_list]
 
-    for iv, v in enumerate([vfci_uhf_list, vfci_ump2])
+    for iv, v in enumerate([vfci_uhf_list, vfci_ump2]):
+        pass
 
     vfci_uhf_list = numpy.asarray(vfci_uhf_list)
     v_dot_v  = numpy.einsum("Iij,Jij->IJ", vfci_uhf_list, vfci_uhf_list)
