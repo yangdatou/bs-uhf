@@ -145,8 +145,11 @@ def get_ucisd_vfci(coeff_rhf=None, coeff_uhf=None, uhf_obj=None):
     ene_uhf = uhf_obj.energy_elec(dm_uhf, h1e=None, vhf=None)[0]
 
     ucisd_obj = ci.UCISD(uhf_obj)
+    ucisd_obj.max_cycle = 100
     ene_ump2_corr, vec_ucisd_ump2 = ucisd_obj.get_init_guess()
     ene_ucisd_corr, vec_ucisd = ucisd_obj.kernel(vec_ucisd_ump2)
+    assert ucisd_obj.converged
+    
     vfci = proj_ucisd_to_fci_vec(coeff_rhf, coeff_uhf, vec_ucisd, nelec, ovlp_ao)
     return ene_ucisd_corr + ene_uhf, vfci
 
@@ -227,25 +230,21 @@ def solve_ump2_noci(v_bs_list, hv_bs_list, v_bs_uhf_list=None, ene_ump2_list=Non
         v_dot_hv = numpy.einsum('Iab,Jab,J->IJ', v_bs_uhf_list, hv_bs_list, diag_sign)
 
         eigvals, eigvecs = scipy.linalg.eig(v_dot_v)
-        assert numpy.linalg.norm(eigvals.imag) < 1e-10
-
-        eigvals = eigvals.real
-        eigvecs = eigvecs.real
         mask = numpy.abs(eigvals) > tol
 
         eigvals = eigvals[mask]
         eigvecs = eigvecs[:,mask]
 
-        heff = reduce(numpy.dot, (eigvecs.T, v_dot_hv, eigvecs))
-        seff = reduce(numpy.dot, (eigvecs.T, v_dot_v, eigvecs))
+        heff = reduce(numpy.dot, (eigvecs.T.conj(), v_dot_hv, eigvecs))
+        seff = reduce(numpy.dot, (eigvecs.T.conj(), v_dot_v, eigvecs))
+        assert numpy.linalg.norm(numpy.diag(seff) - eigvals) < 1e-10
 
         ene_noci, vec_noci = scipy.linalg.eig(heff, seff)
-        assert numpy.linalg.norm(ene_noci.imag) < 1e-10
+        ene_noci_argsort   = numpy.argsort(ene_noci.real)
+        ene_noci           = ene_noci[ene_noci_argsort[0]]
 
+        assert numpy.abs(ene_noci.imag) < 1e-10
         ene_noci = ene_noci.real
-        vec_noci = vec_noci.real
-
-        ene_noci = numpy.min(ene_noci)
 
     return ene_noci
 
@@ -293,24 +292,20 @@ def solve_ucisd_noci(v_bs_list, hv_bs_list, v_bs_uhf_list=None, ene_ucisd_list=N
         v_dot_hv = numpy.einsum('Iab,Jab,J->IJ', v_bs_uhf_list, hv_bs_list, diag_sign)
 
         eigvals, eigvecs = scipy.linalg.eig(v_dot_v)
-        assert numpy.linalg.norm(eigvals.imag) < 1e-10
-
-        eigvals = eigvals.real
-        eigvecs = eigvecs.real
         mask = numpy.abs(eigvals) > tol
 
         eigvals = eigvals[mask]
         eigvecs = eigvecs[:,mask]
 
-        heff = reduce(numpy.dot, (eigvecs.T, v_dot_hv, eigvecs))
-        seff = reduce(numpy.dot, (eigvecs.T, v_dot_v, eigvecs))
+        heff = reduce(numpy.dot, (eigvecs.T.conj(), v_dot_hv, eigvecs))
+        seff = reduce(numpy.dot, (eigvecs.T.conj(), v_dot_v, eigvecs))
+        assert numpy.linalg.norm(numpy.diag(seff) - eigvals) < 1e-10
 
         ene_noci, vec_noci = scipy.linalg.eig(heff, seff)
-        assert numpy.linalg.norm(ene_noci.imag) < 1e-10
-
+        ene_noci_argsort   = numpy.argsort(ene_noci.real)
+        ene_noci           = ene_noci[ene_noci_argsort[0]]
+        
+        assert numpy.abs(ene_noci.imag) < 1e-10
         ene_noci = ene_noci.real
-        vec_noci = vec_noci.real
-
-        ene_noci = numpy.min(ene_noci)
 
     return ene_noci
