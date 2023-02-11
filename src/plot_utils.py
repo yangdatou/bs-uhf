@@ -4,7 +4,7 @@ from numpy import load
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 
-def read_data_from_h5(filename):
+def get_plot_data(filename):
     import h5py
 
     data_dict = {}
@@ -27,6 +27,56 @@ def read_data_from_h5(filename):
         data_dict[k] = numpy.array(v)
 
     return data_dict
+
+def get_plot_style(label_list):
+    style_dict = {}
+
+    for i, label in enumerate(label_list):
+        label_split = label.split("_")
+
+        if len(label_split) == 2:
+            plot_label = label_split[1].upper()
+
+        else:
+            plot_label = "-".join(label_split[1:]).upper()
+
+        if plot_label == "FCI":
+            style_dict[label] = {
+                "marker": "None",
+                "linestyle": "-",
+                "linewidth": 2.0,
+                "markersize": 4.0,
+                "label": plot_label,
+            }
+
+        elif plot_label.split("-")[0] == "NOCI":
+            style_dict[label] = {
+                "marker": ">",
+                "linestyle": "-",
+                "linewidth": 2.0,
+                "markersize": 4.0,
+                "label": plot_label,
+            }
+        
+        elif plot_label.split("-")[0] == "BS":
+            style_dict[label] = {
+                "marker": "None",
+                "linestyle": "dotted",
+                "linewidth": 2.0,
+                "markersize": 4.0,
+                "label": plot_label,
+            }
+
+        else:
+            style_dict[label] = {
+                "marker": "None",
+                "linestyle": "-.",
+                "linewidth": 2.0,
+                "markersize": 4.0,
+                "label": plot_label,
+            }
+
+    return style_dict
 
 params = {
         "font.size":       20,

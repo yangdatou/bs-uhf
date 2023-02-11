@@ -1,5 +1,0 @@
-source /Users/yangjunjie/work/bs-uhf/src/util.vmd; show_mol /Users/yangjunjie/work/bs-uhf/data/h2/cub//h2_mo_beta_1_0.3080.cube
-drawarrow "serial 1" -1.0000  0.0000  0.0000 1.0 0.05
-drawarrow "serial 2"  1.0000  0.0000  0.0000 1.0 0.05
-rotate y by  90.0000
-render TachyonInternal /Users/yangjunjie/work/bs-uhf/data/h2/fig//h2_mo_beta_1_0.3080.png

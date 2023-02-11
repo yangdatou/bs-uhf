@@ -105,14 +105,19 @@ def get_bs_uhf_ao_label(mol=None, m=None):
 
     elif m == "h4-square":
         alph_ao_idx.append(mol.search_ao_label("0 H 1s")[0])
-        alph_ao_idx.append(mol.search_ao_label("2 H 1s")[0])
+        alph_ao_idx.append(mol.search_ao_label("3 H 1s")[0])
         beta_ao_idx.append(mol.search_ao_label("1 H 1s")[0])
-        beta_ao_idx.append(mol.search_ao_label("3 H 1s")[0])
-
-    elif mol == "hub":
-        raise NotImplementedError
+        beta_ao_idx.append(mol.search_ao_label("2 H 1s")[0])
 
     elif mol == "n2":
+        alph_ao_idx.append(mol.search_ao_label("0 N 2px")[0])
+        alph_ao_idx.append(mol.search_ao_label("0 N 2py")[0])
+        alph_ao_idx.append(mol.search_ao_label("0 N 2pz")[0])
+        beta_ao_idx.append(mol.search_ao_label("1 N 2px")[0])
+        beta_ao_idx.append(mol.search_ao_label("1 N 2py")[0])
+        beta_ao_idx.append(mol.search_ao_label("1 N 2pz")[0])
+
+    elif mol == "hub":
         raise NotImplementedError
 
     elif mol == "h6":
@@ -136,6 +141,7 @@ def solve_bs_noci(r, basis="sto-3g", m="h2"):
     alph_ao_idx = res[1]
     beta_ao_idx = res[2]
     bs_ao_idx   = alph_ao_idx + beta_ao_idx
+
 
     dm0 = get_dm_bs(nao, core_ao_idx, alph_ao_idx, beta_ao_idx)
     uhf_obj   = solve_uhf(mol, dm0=dm0)
@@ -204,7 +210,7 @@ def solve_bs_noci(r, basis="sto-3g", m="h2"):
     hv_bs_ucisd_list   = []
 
     alph_ao_idx_comb = combinations(bs_ao_idx, nelec_alph_bs)
-    for idx, alph_ao_idx in enumerate(alph_idx_comb):
+    for idx, alph_ao_idx in enumerate(alph_ao_idx_comb):
         alph_ao_idx = list(alph_ao_idx)
         beta_ao_idx = list(set(bs_ao_idx) - set(alph_ao_idx))
 
