@@ -1,6 +1,5 @@
 import os, sys, numpy, scipy
-
-from utils import solve_bs_noci
+from util import solve_bs_noci
 
 if __name__ == "__main__":
     m        = "h2"
@@ -15,5 +14,5 @@ if __name__ == "__main__":
         os.remove(h5_path)
 
     for x in numpy.linspace(0.4, 2.0, 41):
-        data_dict = solve_h2_bs_uhf(x, basis=basis, m=m)
+        data_dict = solve_bs_noci(x, basis=basis, m=m)
         chkfile.save(h5_path, "%12.8f" % x, data_dict)
