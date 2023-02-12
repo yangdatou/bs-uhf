@@ -15,6 +15,6 @@ if __name__ == "__main__":
     if os.path.exists(h5_path):
         os.remove(h5_path)
 
-    for x in numpy.linspace(0.4, 4.0, 41):
+    for x in numpy.linspace(0.8, 2.4, 41):
         data_dict = solve_bs_noci(x, basis=basis, m=m)
         chkfile.save(h5_path, "%12.8f" % x, data_dict)

@@ -145,7 +145,9 @@ def get_ucisd_vfci(coeff_rhf=None, coeff_uhf=None, uhf_obj=None):
     ene_uhf = uhf_obj.energy_elec(dm_uhf, h1e=None, vhf=None)[0]
 
     ucisd_obj = ci.UCISD(uhf_obj)
-    ucisd_obj.max_cycle = 100
+    ucisd_obj.max_cycle = 1000
+    ucisd_obj.verbose = 5
+    ucisd_obj.max_space = 50
     ene_ump2_corr, vec_ucisd_ump2 = ucisd_obj.get_init_guess()
     ene_ucisd_corr, vec_ucisd = ucisd_obj.kernel(vec_ucisd_ump2)
     assert ucisd_obj.converged
