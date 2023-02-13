@@ -23,8 +23,8 @@ def main(m, basis, dir_path, h5_path, x_list):
 if __name__ == "__main__":
     dir_path = f"./data/"
     if os.path.exists(dir_path):
-        os.remove(dir_path)
-        
+        os.removedirs(dir_path)
+
     m        = "h2"
     basis    = "sto-3g"
     h5_path  = os.path.join(dir_path, f"{m}-{basis}.h5")
