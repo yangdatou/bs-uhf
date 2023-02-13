@@ -23,6 +23,7 @@ export PYSCF_TMPDIR=/scratch/global/yangjunjie/
 
 export PYSCF_TMPDIR=/scratch/global/yangjunjie/;
 export PYTHONPATH=/home/yangjunjie/packages/pyscf/pyscf-main/;
+export PYTHONPATH=/home/yangjunjie/work/bs-uhf/src/:$PYTHONPATH;
 export PYTHONPATH=/home/yangjunjie/packages/wick/wick-dev/:$PYTHONPATH;
 
 python main.py
