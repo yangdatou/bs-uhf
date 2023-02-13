@@ -28,14 +28,31 @@ if __name__ == "__main__":
     x_list   = numpy.linspace(0.5, 3.0, 41)
     main(m, basis, dir_path, h5_path, x_list)
 
+    basis    = "cc-pvdz"
+    h5_path  = os.path.join(dir_path, f"{m}-{basis}.h5")
+    x_list   = numpy.linspace(0.5, 3.0, 41)
+    main(m, basis, dir_path, h5_path, x_list)
+
     m       = "h4-line"
+    basis    = "sto-3g"
     h5_path = os.path.join(dir_path, f"{m}-{basis}.h5")
     x_list  = numpy.linspace(0.5, 3.0, 41)
     main(m, basis, dir_path, h5_path, x_list)
 
+    basis    = "cc-pvdz"
+    h5_path  = os.path.join(dir_path, f"{m}-{basis}.h5")
+    x_list   = numpy.linspace(0.5, 3.0, 41)
+    main(m, basis, dir_path, h5_path, x_list)
+
     m       = "h4-square"
+    basis   = "sto-3g"
     h5_path = os.path.join(dir_path, f"{m}-{basis}.h5")
     x_list  = numpy.linspace(0.5, 3.0, 41)
+    main(m, basis, dir_path, h5_path, x_list)
+
+    basis    = "cc-pvdz"
+    h5_path  = os.path.join(dir_path, f"{m}-{basis}.h5")
+    x_list   = numpy.linspace(0.5, 3.0, 41)
     main(m, basis, dir_path, h5_path, x_list)
 
     m       = "n2"
