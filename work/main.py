@@ -22,40 +22,41 @@ def main(m, basis, dir_path, h5_path, x_list):
 
 if __name__ == "__main__":
     dir_path = f"./data/"
-    m        = "h2"
-    basis    = "sto-3g"
-    h5_path  = os.path.join(dir_path, f"{m}-{basis}.h5")
-    x_list   = numpy.linspace(0.5, 3.0, 41)
-    main(m, basis, dir_path, h5_path, x_list)
+    # m        = "h2"
+    # basis    = "sto-3g"
+    # h5_path  = os.path.join(dir_path, f"{m}-{basis}.h5")
+    # x_list   = numpy.linspace(0.5, 3.0, 41)
+    # main(m, basis, dir_path, h5_path, x_list)
 
-    basis    = "cc-pvdz"
-    h5_path  = os.path.join(dir_path, f"{m}-{basis}.h5")
-    x_list   = numpy.linspace(0.5, 3.0, 41)
-    main(m, basis, dir_path, h5_path, x_list)
+    # basis    = "cc-pvdz"
+    # h5_path  = os.path.join(dir_path, f"{m}-{basis}.h5")
+    # x_list   = numpy.linspace(0.5, 3.0, 41)
+    # main(m, basis, dir_path, h5_path, x_list)
 
-    m       = "h4-line"
-    basis    = "sto-3g"
-    h5_path = os.path.join(dir_path, f"{m}-{basis}.h5")
-    x_list  = numpy.linspace(0.5, 3.0, 41)
-    main(m, basis, dir_path, h5_path, x_list)
+    # m       = "h4-line"
+    # basis    = "sto-3g"
+    # h5_path = os.path.join(dir_path, f"{m}-{basis}.h5")
+    # x_list  = numpy.linspace(0.5, 3.0, 41)
+    # main(m, basis, dir_path, h5_path, x_list)
 
-    basis    = "cc-pvdz"
-    h5_path  = os.path.join(dir_path, f"{m}-{basis}.h5")
-    x_list   = numpy.linspace(0.5, 3.0, 41)
-    main(m, basis, dir_path, h5_path, x_list)
+    # basis    = "cc-pvdz"
+    # h5_path  = os.path.join(dir_path, f"{m}-{basis}.h5")
+    # x_list   = numpy.linspace(0.5, 3.0, 41)
+    # main(m, basis, dir_path, h5_path, x_list)
 
-    m       = "h4-square"
-    basis   = "sto-3g"
-    h5_path = os.path.join(dir_path, f"{m}-{basis}.h5")
-    x_list  = numpy.linspace(0.5, 3.0, 41)
-    main(m, basis, dir_path, h5_path, x_list)
+    # m       = "h4-square"
+    # basis   = "sto-3g"
+    # h5_path = os.path.join(dir_path, f"{m}-{basis}.h5")
+    # x_list  = numpy.linspace(0.5, 3.0, 41)
+    # main(m, basis, dir_path, h5_path, x_list)
 
-    basis    = "cc-pvdz"
-    h5_path  = os.path.join(dir_path, f"{m}-{basis}.h5")
-    x_list   = numpy.linspace(0.5, 3.0, 41)
-    main(m, basis, dir_path, h5_path, x_list)
+    # basis    = "cc-pvdz"
+    # h5_path  = os.path.join(dir_path, f"{m}-{basis}.h5")
+    # x_list   = numpy.linspace(0.5, 3.0, 41)
+    # main(m, basis, dir_path, h5_path, x_list)
 
     m       = "n2"
+    basis    = "sto-3g"
     h5_path = os.path.join(dir_path, f"{m}-{basis}.h5")
     x_list  = numpy.linspace(0.8, 3.0, 41)
     main(m, basis, dir_path, h5_path, x_list)
