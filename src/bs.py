@@ -191,6 +191,9 @@ def truncate_generalized_eigen_problem(h, s, tol=1e-8):
     u, sig, vh = scipy.linalg.svd(s)
     mask = numpy.abs(sig) > tol
 
+    sig_str = ", ".join(f"{s : 12.8e}" for s in sig)
+    print(f"sig = {sig_str}")
+
     u   = u[:,mask]
     sig = sig[mask]
     vh  = vh[mask,:]
