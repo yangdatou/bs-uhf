@@ -26,5 +26,7 @@ export PYTHONPATH=/home/yangjunjie/packages/pyscf/pyscf-main/;
 export PYTHONPATH=/home/yangjunjie/work/bs-uhf/src/:$PYTHONPATH;
 export PYTHONPATH=/home/yangjunjie/packages/wick/wick-dev/:$PYTHONPATH;
 
+export PYTHONUNBUFFERED=TRUE;
+
 python main.py
 
