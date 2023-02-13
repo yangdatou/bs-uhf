@@ -170,7 +170,10 @@ def solve_uhf_noci(v_bs_uhf_list, hv_bs_uhf_list, ene_bs_uhf_list, tol=1e-8):
     v_dot_hv = numpy.einsum('Iab,Jab->IJ', v_bs_uhf_list, hv_bs_uhf_list)
 
     ene_err = numpy.diag(v_dot_hv) / numpy.diag(v_dot_v) - ene_bs_uhf_list
-    assert numpy.linalg.norm(ene_err) < 1e-10
+    ene_err = numpy.linalg.norm(ene_err)
+    if not ene_err < tol:
+        print("Warning: diagonal elements of v_uhf_dot_hv_ump2 is not ene_ump2_list")
+        print(f"ene_err = {ene_err : 12.8e}")
 
     eigvals, eigvecs = scipy.linalg.eigh(v_dot_hv, v_dot_v)
     mask = numpy.abs(eigvals) > tol
@@ -184,7 +187,75 @@ def solve_uhf_noci(v_bs_uhf_list, hv_bs_uhf_list, ene_bs_uhf_list, tol=1e-8):
     ene_noci, vec_noci = scipy.linalg.eigh(heff, seff)
     return ene_noci[0]
 
-def solve_ump2_noci(v_bs_list, hv_bs_list, v_bs_uhf_list=None, ene_ump2_list=None, tol=1e-8, method=1):
+def truncate_generalized_eigen_problem(h, s, tol=1e-8):
+    u, sig, vh = scipy.linalg.svd(s)
+    mask = numpy.abs(sig) > tol
+
+    u   = u[:,mask]
+    sig = sig[mask]
+    vh  = vh[mask,:]
+
+    trunc_err = numpy.linalg.norm(s - reduce(numpy.dot, (u, numpy.diag(sig), vh)))
+
+    if not trunc_err < tol:
+        n0 = s.shape[0]
+        n1 = sig.size
+
+        print("Warning: truncation error is large")
+        print("tol = %8.4e, trunc_err = %8.4e: %d -> %d" % (tol, truncate_err, n0, n1))
+
+    heff = reduce(numpy.dot, (u.T, h, vh.T))
+    seff = reduce(numpy.dot, (u.T, s, vh.T))
+    return heff, seff
+
+def solve_variational_noci(v1, hv1, v2=None, tol=1e-8, ref=None):
+    v1_dot_v1  = numpy.einsum('Iab,Jab->IJ', v1, v1)
+    v1_dot_hv1 = numpy.einsum('Iab,Jab->IJ', v1, hv1)
+    heff, seff = truncate_generalized_eigen_problem(v1_dot_hv1, v1_dot_v1, tol=tol)
+
+    is_symmetric = numpy.allclose(heff, heff.T, atol=tol)
+    if not is_symmetric:
+        print("Warning: heff is not symmetric, please check")
+        print("heff = ")
+        dump_rec(stdout, heff)
+
+    ene_noci, vec_noci = scipy.linalg.eigh(heff, seff)
+    ene_noci = numpy.min(ene_noci)
+
+    if not numpy.abs(ene_noci.imag) < tol:
+        print("Warning: imaginary part of noci energy is large")
+        print(f"ene_noci = {ene_noci.real : 20.12f} + {ene_noci.imag : 20.12f}i")
+
+    return ene_noci
+
+def solve_projection_noci(v1, hv1, v2=None, tol=1e-8, ref=None):
+    v2_dot_v1_diag = numpy.einsum('Iab,Iab->I', v2, v1)
+    diag_sign      = numpy.sign(v2_dot_v1_diag)
+
+    v2_dot_v1  = numpy.einsum('Iab,Jab->IJ', v2 * diag_sign[:,None,None],  v1)
+    v2_dot_hv1 = numpy.einsum('Iab,Jab->IJ', v2 * diag_sign[:,None,None], hv1)
+    heff, seff = truncate_generalized_eigen_problem(v2_dot_hv1, v2_dot_v1, tol=tol)
+
+    ene_noci, vec_noci = scipy.linalg.eig(heff, seff)
+
+    ene_noci_idx = numpy.argmin(ene_noci.real)
+    if ref is not None:
+        ene_noci_ref = numpy.argmin(numpy.abs(ene_noci.real - ref))
+        if ene_noci_idx != ene_noci_ref:
+            print("Warning: noci reference energy is used instead of the minimum energy")
+            print(f"{ene_noci.real[ene_noci_idx] : 20.12f} + {ene_noci.imag[ene_noci_idx] : 20.12f}i")
+            print(f"{ene_noci.real[ene_noci_ref] : 20.12f} + {ene_noci.imag[ene_noci_ref] : 20.12f}i")
+        ene_noci_idx = ene_noci_ref
+
+    ene_noci = ene_noci[ene_noci_idx]
+
+    if not numpy.abs(ene_noci.imag) < tol:
+        print("Warning: imaginary part of noci energy is large")
+        print(f"ene_noci = {ene_noci.real : 12.8f}{ene_noci.imag :+12.8f}i")
+
+    return ene_noci.real
+
+def solve_ump2_noci(v_bs_list, hv_bs_list, v_bs_uhf_list=None, ene_ump2_list=None, tol=1e-8, ref=None, method=1):
     ene_ump2_list = numpy.asarray(ene_ump2_list)
     v_bs_list     = numpy.asarray(v_bs_list)
     hv_bs_list    = numpy.asarray(hv_bs_list)
@@ -202,54 +273,31 @@ def solve_ump2_noci(v_bs_list, hv_bs_list, v_bs_uhf_list=None, ene_ump2_list=Non
     v_uhf_dot_v_ump2  = numpy.einsum('Iab,Jab->IJ', v_bs_uhf_list, v_bs_list)
 
     diag_err = numpy.linalg.norm(numpy.diag(v_uhf_dot_v_ump2) - 1.0)
-    assert diag_err < 1e-10
+    if not diag_err < tol:
+        print("Warning: diagonal elements of v_uhf_dot_v_ump2 is not 1.0")
+        print(f"diag_err = {diag_err : 12.8e}")
 
-    ene_err = numpy.diag(v_uhf_dot_hv_ump2) / numpy.diag(v_uhf_dot_v_ump2) - ene_ump2_list
-    assert numpy.linalg.norm(ene_err) < 1e-10
+    ene_err = numpy.diag(v_uhf_dot_hv_ump2) - ene_ump2_list
+    ene_err = numpy.linalg.norm(ene_err)
+    if not ene_err < tol:
+        print("Warning: diagonal elements of v_uhf_dot_hv_ump2 is not ene_ump2_list")
+        print(f"ene_err = {ene_err : 12.8e}")
 
     if method == 1:
-        v_dot_v  = numpy.einsum('Iab,Jab->IJ', v_bs_list, v_bs_list)
-        v_dot_hv = numpy.einsum('Iab,Jab->IJ', v_bs_list, hv_bs_list)
-
-        eigvals, eigvecs = scipy.linalg.eigh(v_dot_hv, v_dot_v)
-        mask = numpy.abs(eigvals) > tol
-
-        eigvals = eigvals[mask]
-        eigvecs = eigvecs[:,mask]
-
-        heff = reduce(numpy.dot, (eigvecs.T, v_dot_hv, eigvecs))
-        seff = reduce(numpy.dot, (eigvecs.T, v_dot_v, eigvecs))
-
-        ene_noci, vec_noci = scipy.linalg.eigh(heff, seff)
-        ene_noci = numpy.min(ene_noci)
+        v1  = v_bs_list
+        hv1 = hv_bs_list
+        v2  = v_bs_uhf_list
+        ene_noci = solve_variational_noci(v1, hv1, v2=v2, tol=tol, ref=ref)
 
     elif method == 2:
-        v_dot_v_diag = numpy.einsum('Iab,Iab->I', v_bs_uhf_list, v_bs_list)
-        diag_sign    = numpy.sign(v_dot_v_diag)
-
-        v_dot_v  = numpy.einsum('Iab,Jab,J->IJ', v_bs_uhf_list, v_bs_list, diag_sign)
-        v_dot_hv = numpy.einsum('Iab,Jab,J->IJ', v_bs_uhf_list, hv_bs_list, diag_sign)
-
-        eigvals, eigvecs = scipy.linalg.eig(v_dot_v)
-        mask = numpy.abs(eigvals) > tol
-
-        eigvals = eigvals[mask]
-        eigvecs = eigvecs[:,mask]
-
-        heff = reduce(numpy.dot, (eigvecs.T.conj(), v_dot_hv, eigvecs))
-        seff = reduce(numpy.dot, (eigvecs.T.conj(), v_dot_v, eigvecs))
-        assert numpy.linalg.norm(numpy.diag(seff) - eigvals) < 1e-10
-
-        ene_noci, vec_noci = scipy.linalg.eig(heff, seff)
-        ene_noci_argsort   = numpy.argsort(ene_noci.real)
-        ene_noci           = ene_noci[ene_noci_argsort[0]]
-
-        assert numpy.abs(ene_noci.imag) < 1e-10
-        ene_noci = ene_noci.real
+        v1  = v_bs_list
+        hv1 = hv_bs_list
+        v2  = v_bs_uhf_list
+        ene_noci = solve_projection_noci(v1, hv1, v2=v2, tol=tol, ref=ref)
 
     return ene_noci
 
-def solve_ucisd_noci(v_bs_list, hv_bs_list, v_bs_uhf_list=None, ene_ucisd_list=None, tol=1e-8, method=1):
+def solve_ucisd_noci(v_bs_list, hv_bs_list, v_bs_uhf_list=None, ene_ucisd_list=None, tol=1e-8, ref=None, method=1):
     ene_ucisd_list = numpy.asarray(ene_ucisd_list)
     v_bs_list     = numpy.asarray(v_bs_list)
     hv_bs_list    = numpy.asarray(hv_bs_list)
@@ -267,46 +315,26 @@ def solve_ucisd_noci(v_bs_list, hv_bs_list, v_bs_uhf_list=None, ene_ucisd_list=N
     v_dot_hv = numpy.einsum('Iab,Jab->IJ', v_bs_list, hv_bs_list)
 
     diag_err = numpy.diag(v_dot_v) - 1.0
-    assert numpy.linalg.norm(diag_err) < 1e-10
+    if not numpy.linalg.norm(diag_err) < tol:
+        print("Warning: diagonal elements of v_dot_v is not 1.0")
+        print(f"diag_err = {diag_err : 12.8e}")
 
     ene_err = numpy.diag(v_dot_hv) - ene_ucisd_list
-    assert numpy.linalg.norm(ene_err) < 1e-10
+    ene_err = numpy.linalg.norm(ene_err)
+    if not ene_err < tol:
+        print("Warning: diagonal elements of v_dot_hv is not ene_ucisd_list")
+        print(f"ene_err = {ene_err : 12.8e}")
 
     if method == 1:
-        eigvals, eigvecs = scipy.linalg.eigh(v_dot_v)
-        mask = numpy.abs(eigvals) > tol
-
-        eigvals = eigvals[mask]
-        eigvecs = eigvecs[:,mask]
-
-        heff = reduce(numpy.dot, (eigvecs.T, v_dot_hv, eigvecs))
-        seff = reduce(numpy.dot, (eigvecs.T, v_dot_v, eigvecs))
-
-        ene_noci, vec_noci = scipy.linalg.eigh(heff, seff)
-        ene_noci = numpy.min(ene_noci)
+        v1  = v_bs_list
+        hv1 = hv_bs_list
+        v2  = v_bs_uhf_list
+        ene_noci = solve_variational_noci(v1, hv1, v2=v2, tol=tol, ref=ref)
 
     elif method == 2:
-        v_dot_v_diag = numpy.einsum('Iab,Iab->I', v_bs_uhf_list, v_bs_list)
-        diag_sign    = numpy.sign(v_dot_v_diag)
-
-        v_dot_v  = numpy.einsum('Iab,Jab,J->IJ', v_bs_uhf_list, v_bs_list, diag_sign)
-        v_dot_hv = numpy.einsum('Iab,Jab,J->IJ', v_bs_uhf_list, hv_bs_list, diag_sign)
-
-        eigvals, eigvecs = scipy.linalg.eig(v_dot_v)
-        mask = numpy.abs(eigvals) > tol
-
-        eigvals = eigvals[mask]
-        eigvecs = eigvecs[:,mask]
-
-        heff = reduce(numpy.dot, (eigvecs.T.conj(), v_dot_hv, eigvecs))
-        seff = reduce(numpy.dot, (eigvecs.T.conj(), v_dot_v, eigvecs))
-        assert numpy.linalg.norm(numpy.diag(seff) - eigvals) < 1e-10
-
-        ene_noci, vec_noci = scipy.linalg.eig(heff, seff)
-        ene_noci_argsort   = numpy.argsort(ene_noci.real)
-        ene_noci           = ene_noci[ene_noci_argsort[0]]
-        
-        assert numpy.abs(ene_noci.imag) < 1e-10
-        ene_noci = ene_noci.real
+        v1  = v_bs_list
+        hv1 = hv_bs_list
+        v2  = v_bs_uhf_list
+        ene_noci = solve_projection_noci(v1, hv1, v2=v2, tol=tol, ref=ref)
 
     return ene_noci

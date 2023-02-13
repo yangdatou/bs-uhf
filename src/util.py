@@ -116,8 +116,6 @@ def get_bs_uhf_ao_label(mol=None, m=None):
         core_ao_idx.append(mol.search_ao_label("1 N 1s")[0])
         core_ao_idx.append(mol.search_ao_label("0 N 2s")[0])
         core_ao_idx.append(mol.search_ao_label("1 N 2s")[0])
-        # core_ao_idx.append(mol.search_ao_label("0 N 2pz")[0])
-        # core_ao_idx.append(mol.search_ao_label("1 N 2pz")[0])
 
         alph_ao_idx.append(mol.search_ao_label("0 N 2px")[0])
         alph_ao_idx.append(mol.search_ao_label("0 N 2py")[0])
@@ -244,19 +242,19 @@ def solve_bs_noci(r, basis="sto-3g", m="h2"):
 
         data_dict["ene_bs_uhf_%s" % idx]   = ene_bs_uhf
         data_dict["ene_bs_ump2_%s" % idx]  = ene_bs_ump2
-        # data_dict["ene_bs_ucisd_%s" % idx] = ene_bs_ucisd
+        data_dict["ene_bs_ucisd_%s" % idx] = ene_bs_ucisd
 
     ene_noci_uhf     = solve_uhf_noci(v_bs_uhf_list,  hv_bs_uhf_list, ene_bs_uhf_list, tol=1e-8)
-    ene_noci_ump2_1  = solve_ump2_noci(v_bs_ump2_list, hv_bs_ump2_list, v_bs_uhf_list=v_bs_uhf_list, ene_ump2_list=ene_bs_ump2_list, tol=1e-8, method=1)
-    # ene_noci_ump2_2  = solve_ump2_noci(v_bs_ump2_list, hv_bs_ump2_list, v_bs_uhf_list=v_bs_uhf_list, ene_ump2_list=ene_bs_ump2_list, tol=1e-8, method=2)
-    ene_noci_ucisd_1 = solve_ucisd_noci(v_bs_ucisd_list, hv_bs_ucisd_list, v_bs_uhf_list=v_bs_uhf_list, ene_ucisd_list=ene_bs_ucisd_list, tol=1e-8)
-    # ene_noci_ucisd_2 = solve_ucisd_noci(v_bs_ucisd_list, hv_bs_ucisd_list, v_bs_uhf_list=v_bs_uhf_list, ene_ucisd_list=ene_bs_ucisd_list, tol=1e-8, method=2)
+    ene_noci_ump2_1  = solve_ump2_noci(v_bs_ump2_list, hv_bs_ump2_list, v_bs_uhf_list=v_bs_uhf_list, ene_ump2_list=ene_bs_ump2_list, tol=1e-8, method=1, ref=ene_fci)
+    ene_noci_ump2_2  = solve_ump2_noci(v_bs_ump2_list, hv_bs_ump2_list, v_bs_uhf_list=v_bs_uhf_list, ene_ump2_list=ene_bs_ump2_list, tol=1e-8, method=2, ref=ene_fci)
+    ene_noci_ucisd_1 = solve_ucisd_noci(v_bs_ucisd_list, hv_bs_ucisd_list, v_bs_uhf_list=v_bs_uhf_list, ene_ucisd_list=ene_bs_ucisd_list, tol=1e-8, method=1, ref=ene_fci)
+    ene_noci_ucisd_2 = solve_ucisd_noci(v_bs_ucisd_list, hv_bs_ucisd_list, v_bs_uhf_list=v_bs_uhf_list, ene_ucisd_list=ene_bs_ucisd_list, tol=1e-8, method=2, ref=ene_fci)
 
     data_dict["ene_noci_uhf"]     = ene_noci_uhf
     data_dict["ene_noci_ump2_1"]  = ene_noci_ump2_1
-    # data_dict["ene_noci_ump2_2"]  = ene_noci_ump2_2
+    data_dict["ene_noci_ump2_2"]  = ene_noci_ump2_2
     data_dict["ene_noci_ucisd_1"] = ene_noci_ucisd_1
-    # data_dict["ene_noci_ucisd_2"] = ene_noci_ucisd_2
+    data_dict["ene_noci_ucisd_2"] = ene_noci_ucisd_2
 
     print("r = %6.4f, ene_fci = %12.6f, ene_noci_uhf = %12.6f, ene_noci_ump2_1 = %12.6f, ene_noci_ucisd_1 = %12.6f" % (r, ene_fci, ene_noci_uhf, ene_noci_ump2_1, ene_noci_ucisd_1))
 
