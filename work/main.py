@@ -21,9 +21,12 @@ def main(m, basis, dir_path, h5_path, x_list):
         chkfile.save(h5_path, "%12.8f" % x, data_dict)
 
 if __name__ == "__main__":
+    dir_path = f"./data/"
+    if os.path.exists(dir_path):
+        os.remove(dir_path)
+        
     m        = "h2"
     basis    = "sto-3g"
-    dir_path = f"./data/"
     h5_path  = os.path.join(dir_path, f"{m}-{basis}.h5")
     x_list   = numpy.linspace(0.5, 3.0, 41)
     main(m, basis, dir_path, h5_path, x_list)
