@@ -55,7 +55,7 @@ if __name__ == "__main__":
     x_list   = numpy.linspace(0.5, 3.0, 41)
     main(m, basis, dir_path, h5_path, x_list)
 
-    m       = "n2"
-    h5_path = os.path.join(dir_path, f"{m}-{basis}.h5")
-    x_list  = numpy.linspace(0.8, 3.0, 41)
-    main(m, basis, dir_path, h5_path, x_list)
+    # m       = "n2"
+    # h5_path = os.path.join(dir_path, f"{m}-{basis}.h5")
+    # x_list  = numpy.linspace(0.8, 3.0, 41)
+    # main(m, basis, dir_path, h5_path, x_list)
