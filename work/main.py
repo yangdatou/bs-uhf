@@ -25,20 +25,20 @@ if __name__ == "__main__":
     basis    = "sto-3g"
     dir_path = f"./data/"
     h5_path  = os.path.join(dir_path, f"{m}-{basis}.h5")
-    x_list   = numpy.linspace(0.5, 3.0, 10)
+    x_list   = numpy.linspace(0.5, 3.0, 41)
     main(m, basis, dir_path, h5_path, x_list)
 
     m       = "h4-line"
     h5_path = os.path.join(dir_path, f"{m}-{basis}.h5")
-    x_list  = numpy.arange(0.5, 3.0, 0.1)
+    x_list  = numpy.linspace(0.5, 3.0, 41)
     main(m, basis, dir_path, h5_path, x_list)
 
     m       = "h4-square"
     h5_path = os.path.join(dir_path, f"{m}-{basis}.h5")
-    x_list  = numpy.arange(0.5, 3.0, 0.1)
+    x_list  = numpy.linspace(0.5, 3.0, 41)
     main(m, basis, dir_path, h5_path, x_list)
 
     m       = "n2"
     h5_path = os.path.join(dir_path, f"{m}-{basis}.h5")
-    x_list  = numpy.arange(0.5, 3.0, 0.1)
+    x_list  = numpy.linspace(0.8, 3.0, 41)
     main(m, basis, dir_path, h5_path, x_list)
