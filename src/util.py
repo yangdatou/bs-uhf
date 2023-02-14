@@ -222,9 +222,9 @@ def solve_bs_noci(r, basis="sto-3g", m="h2"):
 
         print("idx = %d" % idx)
         for i in alph_ao_idx:
-            print(" %d" % i, mol.ao_labels()[i])
+            print("alph %d" % i, mol.ao_labels()[i])
         for i in beta_ao_idx:
-            print(" %d" % i, mol.ao_labels()[i])
+            print("beta %d" % i, mol.ao_labels()[i])
 
         dm0 = get_dm_bs(nao, core_ao_idx, alph_ao_idx, beta_ao_idx)
         ene_bs_uhf_ref, coeff_bs_uhf = get_coeff_uhf(uhf_obj, dm0, is_scf=False)
