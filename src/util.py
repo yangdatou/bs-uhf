@@ -220,6 +220,8 @@ def solve_bs_noci(r, basis="sto-3g", m="h2"):
         alph_ao_idx = list(alph_ao_idx)
         beta_ao_idx = list(set(bs_ao_idx) - set(alph_ao_idx))
 
+        print("idx = %d, alph_ao_idx = %s, beta_ao_idx = %s" % (idx, alph_ao_idx, beta_ao_idx))
+
         dm0 = get_dm_bs(nao, core_ao_idx, alph_ao_idx, beta_ao_idx)
         ene_bs_uhf_ref, coeff_bs_uhf = get_coeff_uhf(uhf_obj, dm0, is_scf=False)
         ene_bs_uhf, vfci_bs_uhf      = get_uhf_vfci(coeff_rhf, coeff_bs_uhf, uhf_obj=uhf_obj)
