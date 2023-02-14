@@ -218,7 +218,7 @@ def solve_variational_noci(v1, hv1, v2=None, tol=1e-8, ref=None):
     v1_dot_v1  = numpy.einsum('Iab,Jab->IJ', v1, v1)
     v1_dot_hv1 = numpy.einsum('Iab,Jab->IJ', v1, hv1)
 
-    res  = truncate_generalized_eigen_problem(v2_dot_hv1, v2_dot_v1, tol=tol)
+    res  = truncate_generalized_eigen_problem(v1_dot_hv1, v1_dot_v1, tol=tol)
     heff = res[0]
     seff = res[1]
 
