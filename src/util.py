@@ -220,7 +220,7 @@ def solve_bs_noci(r, basis="sto-3g", m="h2"):
         alph_ao_idx = list(alph_ao_idx)
         beta_ao_idx = list(set(bs_ao_idx) - set(alph_ao_idx))
 
-        print("idx = %d")
+        print("idx = %d" % idx)
         for i in alph_ao_idx:
             print(" %d" % i, mol.ao_labels()[i])
         for i in beta_ao_idx:
