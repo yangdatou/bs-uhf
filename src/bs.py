@@ -201,12 +201,12 @@ def truncate_generalized_eigen_problem(h, s, tol=1e-8):
 
     if not trunc_err < tol:
         print("Warning: truncation error is large")
-        print("tol = %8.4e, trunc_err = %8.4e: %d -> %d" % (tol, truncate_err, n0, n1))
+        print("tol = %8.4e, trunc_err = %8.4e: %d -> %d" % (tol, trunc_err, n0, n1))
 
-    if n0 != n1:
-        print("tol = %8.4e, trunc_err = %8.4e: %d -> %d" % (tol, truncate_err, n0, n1))
-
+    if n0 != n1: #TODO: remove this
+        print("tol = %8.4e, trunc_err = %8.4e: %d -> %d" % (tol, trunc_err, n0, n1))
         print("S = \n")
+
         dump_rec(stdout, s)
 
     heff = reduce(numpy.dot, (u.T, h, vh.T))
