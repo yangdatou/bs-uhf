@@ -250,12 +250,12 @@ def solve_bs_noci(r, basis="sto-3g", m="h2"):
     ene_noci_ucisd_1 = solve_ucisd_noci(v_bs_ucisd_list, hv_bs_ucisd_list, v_bs_uhf_list=v_bs_uhf_list, ene_ucisd_list=ene_bs_ucisd_list, tol=1e-8, method=1, ref=ene_fci)
     # ene_noci_ucisd_2 = solve_ucisd_noci(v_bs_ucisd_list, hv_bs_ucisd_list, v_bs_uhf_list=v_bs_uhf_list, ene_ucisd_list=ene_bs_ucisd_list, tol=1e-8, method=2, ref=ene_fci)
 
-    data_dict["ene_noci_uhf"]     = ene_noci_uhf
-    data_dict["ene_noci_ump2_1"]  = ene_noci_ump2_1
-    data_dict["ene_noci_ump2_2"]  = ene_noci_ump2_2
-    data_dict["ene_noci_ucisd_1"] = ene_noci_ucisd_1
-    data_dict["ene_noci_ucisd_2"] = ene_noci_ucisd_2
+    # data_dict["ene_noci_uhf"]     = ene_noci_uhf
+    # data_dict["ene_noci_ump2_1"]  = ene_noci_ump2_1
+    # data_dict["ene_noci_ump2_2"]  = ene_noci_ump2_2
+    # data_dict["ene_noci_ucisd_1"] = ene_noci_ucisd_1
+    # data_dict["ene_noci_ucisd_2"] = ene_noci_ucisd_2
 
-    print("r = %6.4f, ene_fci = %12.6f, ene_noci_uhf = %12.6f, ene_noci_ump2_1 = %12.6f, ene_noci_ucisd_1 = %12.6f" % (r, ene_fci, ene_noci_uhf, ene_noci_ump2_1, ene_noci_ucisd_1))
+    # print("r = %6.4f, ene_fci = %12.6f, ene_noci_uhf = %12.6f, ene_noci_ump2_1 = %12.6f, ene_noci_ucisd_1 = %12.6f" % (r, ene_fci, ene_noci_uhf, ene_noci_ump2_1, ene_noci_ucisd_1))
 
     return data_dict
