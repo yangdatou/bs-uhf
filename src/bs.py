@@ -209,11 +209,14 @@ def truncate_generalized_eigen_problem(h, s, tol=1e-8):
 
         dump_rec(stdout, s)
 
+        list_config_pair = []
         for i in range(n0):
             for j in range(n0):
                 if i != j and abs(s[i,j]) > 0.95:
+                    list_config_pair.append((i,j))
                     print("S[%d,%d] = %8.4e" % (i, j, s[i,j]))
-    
+
+        print("list_config_pair = ", len(list_config_pair))
         assert 1 == 2
 
     heff = reduce(numpy.dot, (u.T, h, vh.T))
