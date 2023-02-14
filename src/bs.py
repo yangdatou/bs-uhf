@@ -209,6 +209,13 @@ def truncate_generalized_eigen_problem(h, s, tol=1e-8):
 
         dump_rec(stdout, s)
 
+        for i in range(n0):
+            for j in range(n0):
+                if i != j and abs(s[i,j]) > 0.9:
+                    print("S[%d,%d] = %8.4e" % (i, j, s[i,j]))
+    
+        ssert 1 == 2
+
     heff = reduce(numpy.dot, (u.T, h, vh.T))
     seff = reduce(numpy.dot, (u.T, s, vh.T))
 
