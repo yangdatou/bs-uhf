@@ -211,7 +211,7 @@ def truncate_generalized_eigen_problem(h, s, tol=1e-8):
 
         for i in range(n0):
             for j in range(n0):
-                if i != j and abs(s[i,j]) > 0.9:
+                if i != j and abs(s[i,j]) > 0.95:
                     print("S[%d,%d] = %8.4e" % (i, j, s[i,j]))
     
         assert 1 == 2
