@@ -145,8 +145,8 @@ def get_ucisd_vfci(coeff_rhf=None, coeff_uhf=None, uhf_obj=None):
     ene_uhf = uhf_obj.energy_elec(dm_uhf, h1e=None, vhf=None)[0]
 
     ucisd_obj = ci.UCISD(uhf_obj)
-    ucisd_obj.max_cycle = 5000
-    ucisd_obj.max_space = 500
+    ucisd_obj.max_cycle = 50000
+    ucisd_obj.max_space = 1000
     ene_ump2_corr, vec_ucisd_ump2 = ucisd_obj.get_init_guess()
     ene_ucisd_corr, vec_ucisd = ucisd_obj.kernel(vec_ucisd_ump2)
     assert ucisd_obj.converged
@@ -188,33 +188,39 @@ def solve_uhf_noci(v_bs_uhf_list, hv_bs_uhf_list, ene_bs_uhf_list, tol=1e-8):
     return ene_noci[0]
 
 def truncate_generalized_eigen_problem(h, s, tol=1e-8):
-    u, sig, vh = scipy.linalg.svd(s)
-    mask = numpy.abs(sig) > tol
-
-    sig_str = ", ".join(f"{s : 12.8e}" for s in sig)
-    print(f"sig = {sig_str}")
+    u, e, vh = scipy.linalg.svd(s)
+    mask = numpy.abs(e) > tol
 
     u   = u[:,mask]
-    sig = sig[mask]
+    e   = e[mask]
     vh  = vh[mask,:]
 
-    trunc_err = numpy.linalg.norm(s - reduce(numpy.dot, (u, numpy.diag(sig), vh)))
+    n0 = s.shape[0]
+    n1 = vh.shape[0]
+    trunc_err = numpy.linalg.norm(s - reduce(numpy.dot, (u, numpy.diag(e), vh)))
 
     if not trunc_err < tol:
-        n0 = s.shape[0]
-        n1 = sig.size
-
         print("Warning: truncation error is large")
         print("tol = %8.4e, trunc_err = %8.4e: %d -> %d" % (tol, truncate_err, n0, n1))
 
+    if n0 != n1:
+        print("tol = %8.4e, trunc_err = %8.4e: %d -> %d" % (tol, truncate_err, n0, n1))
+
+        print("S = \n")
+        dump_rec(stdout, s)
+
     heff = reduce(numpy.dot, (u.T, h, vh.T))
     seff = reduce(numpy.dot, (u.T, s, vh.T))
+
     return heff, seff
 
 def solve_variational_noci(v1, hv1, v2=None, tol=1e-8, ref=None):
     v1_dot_v1  = numpy.einsum('Iab,Jab->IJ', v1, v1)
     v1_dot_hv1 = numpy.einsum('Iab,Jab->IJ', v1, hv1)
-    heff, seff = truncate_generalized_eigen_problem(v1_dot_hv1, v1_dot_v1, tol=tol)
+
+    res  = truncate_generalized_eigen_problem(v2_dot_hv1, v2_dot_v1, tol=tol)
+    heff = res[0]
+    seff = res[1]
 
     is_symmetric = numpy.allclose(heff, heff.T, atol=tol)
     if not is_symmetric:
@@ -232,12 +238,12 @@ def solve_variational_noci(v1, hv1, v2=None, tol=1e-8, ref=None):
     return ene_noci
 
 def solve_projection_noci(v1, hv1, v2=None, tol=1e-8, ref=None):
-    v2_dot_v1_diag = numpy.einsum('Iab,Iab->I', v2, v1)
-    diag_sign      = numpy.sign(v2_dot_v1_diag)
+    v2_dot_v1  = numpy.einsum('Iab,Jab->IJ', v2,  v1)
+    v2_dot_hv1 = numpy.einsum('Iab,Jab->IJ', v2, hv1)
 
-    v2_dot_v1  = numpy.einsum('Iab,Jab->IJ', v2 * diag_sign[:,None,None],  v1)
-    v2_dot_hv1 = numpy.einsum('Iab,Jab->IJ', v2 * diag_sign[:,None,None], hv1)
-    heff, seff = truncate_generalized_eigen_problem(v2_dot_hv1, v2_dot_v1, tol=tol)
+    res  = truncate_generalized_eigen_problem(v2_dot_hv1, v2_dot_v1, tol=tol)
+    heff = res[0]
+    seff = res[1]
 
     ene_noci, vec_noci = scipy.linalg.eig(heff, seff)
 
