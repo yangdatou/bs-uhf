@@ -252,8 +252,12 @@ def solve_projection_noci(v1, hv1, v2=None, tol=1e-8, ref=None):
         ene_noci_ref = numpy.argmin(numpy.abs(ene_noci.real - ref))
         if ene_noci_idx != ene_noci_ref:
             print("Warning: noci reference energy is used instead of the minimum energy")
+            print(f"ref = {ref : 20.12f}")
             print(f"{ene_noci.real[ene_noci_idx] : 20.12f} + {ene_noci.imag[ene_noci_idx] : 20.12f}i")
             print(f"{ene_noci.real[ene_noci_ref] : 20.12f} + {ene_noci.imag[ene_noci_ref] : 20.12f}i")
+
+            for i in range(ene_noci.size):
+                print(f"{ene_noci.real[i] : 20.12f} + {ene_noci.imag[i] : 20.12f}i")
         ene_noci_idx = ene_noci_ref
 
     ene_noci = ene_noci[ene_noci_idx]
