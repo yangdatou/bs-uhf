@@ -268,6 +268,6 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
     data_dict["s2_noci_ump2_1"]  = spin_square(vfci_noci_ump2_1, norb, (nelec_alph, nelec_beta), mo_coeff=coeff_rhf)[0]
     data_dict["s2_noci_ump2_2"]  = spin_square(vfci_noci_ump2_2, norb, (nelec_alph, nelec_beta), mo_coeff=coeff_rhf)[0]
 
-    # print("r = %6.4f, ene_fci = %12.6f, ene_noci_uhf = %12.6f, ene_noci_ump2_1 = %12.6f, ene_noci_ucisd_1 = %12.6f" % (r, ene_fci, ene_noci_uhf, ene_noci_ump2_1, ene_noci_ucisd_1))
+    print("r = %6.4f, ene_fci = %12.6f, ene_noci_uhf = %12.6f, ene_noci_ump2_1 = %12.6f" % (r, ene_fci, ene_noci_uhf, ene_noci_ump2_1))
 
     return data_dict
