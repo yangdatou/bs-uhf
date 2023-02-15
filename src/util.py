@@ -279,6 +279,6 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
     data_dict["s2_noci_ump2_1"]  = s2_from_fcivec(vfci_noci_ump2_1)
     data_dict["s2_noci_ump2_2"]  = s2_from_fcivec(vfci_noci_ump2_2)
 
-    print("r = %6.4f, ene_fci = %12.6f, ene_noci_uhf = %12.6f, ene_noci_ump2_1 = %12.6f" % (r, ene_fci, ene_noci_uhf, ene_noci_ump2_1))
+    print("%6.4f, %12.6f, %12.6f, %12.6f, %12.6f" % (r, ene_fci, ene_noci_uhf, ene_noci_ump2_1, ene_noci_ump2_2))
 
     return data_dict

@@ -188,14 +188,15 @@ def truncate_generalized_eigen_problem(h, s, tol=1e-8):
     mask = numpy.abs(e) > tol
 
     n0 = s.shape[0]
-    tmp = ""
+    tmp = "\nSingular values = \n"
     for i in range(n0):
-        tmp += "%8.4e, " % e[i]
-        if i % 5 == 4:
-            tmp = tmp[-1] + "\n"
-    if tmp[-1] == ",":
-        tmp = tmp[:-1]
-    print(tmp)
+        if i > 0 and i % 5 == 0:
+            tmp = tmp[:-2] + "\n"
+        tmp += "% 8.4e, " % e[i]
+
+    if tmp[-2] == ",":
+        tmp = tmp[:-2]
+    print(tmp + "\n")
 
     u   = u[:,mask]
     e   = e[mask]
