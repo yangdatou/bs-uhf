@@ -264,6 +264,10 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
     # data_dict["ene_noci_ucisd_1"] = ene_noci_ucisd_1
     # data_dict["ene_noci_ucisd_2"] = ene_noci_ucisd_2
     
+    dump_rec(stdout, vfci_noci_uhf)
+    print("S2 NOCI UHF")
+    print(numpy.einsum("ab,ab", vfci_noci_uhf, vfci_noci_uhf))
+    print(spin_square(vfci_noci_uhf, norb, (nelec_alph, nelec_beta), mo_coeff=coeff_rhf)[0])
     data_dict["s2_noci_uhf"]     = spin_square(vfci_noci_uhf, norb, (nelec_alph, nelec_beta), mo_coeff=coeff_rhf)[0]
     data_dict["s2_noci_ump2_1"]  = spin_square(vfci_noci_ump2_1, norb, (nelec_alph, nelec_beta), mo_coeff=coeff_rhf)[0]
     data_dict["s2_noci_ump2_2"]  = spin_square(vfci_noci_ump2_2, norb, (nelec_alph, nelec_beta), mo_coeff=coeff_rhf)[0]

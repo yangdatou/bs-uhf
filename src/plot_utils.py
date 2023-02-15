@@ -41,7 +41,6 @@ def get_plot_data(filename):
             r_dict  = f[key]
             
             for k, v in r_dict.items():
-                print("Reading data from: ", k)
                 if k not in data_dict:
                     data_dict[k] = []
                 data_dict[k].append((float(key), float(v[()])))
