@@ -256,11 +256,11 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
 
         data_dict["ene_bs_uhf_%s" % idx]   = ene_bs_uhf
         data_dict["ene_bs_ump2_%s" % idx]  = ene_bs_ump2
-        data_dict["ene_bs_ucisd_%s" % idx] = ene_bs_ucisd
+        # data_dict["ene_bs_ucisd_%s" % idx] = ene_bs_ucisd
 
         data_dict["s2_bs_uhf_%s" % idx]    = s2_from_fcivec(vfci_bs_uhf)
         data_dict["s2_bs_ump2_%s" % idx]   = s2_from_fcivec(vfci_bs_ump2)
-        data_dict["s2_bs_ucisd_%s" % idx]  = s2_from_fcivec(vfci_bs_ucisd)
+        # data_dict["s2_bs_ucisd_%s" % idx]  = s2_from_fcivec(vfci_bs_ucisd)
 
     ene_noci_uhf, vfci_noci_uhf        = solve_uhf_noci(v_bs_uhf_list,  hv_bs_uhf_list, ene_bs_uhf_list, tol=1e-8)
     ene_noci_ump2_1, vfci_noci_ump2_1  = solve_ump2_noci(v_bs_ump2_list, hv_bs_ump2_list, v_bs_uhf_list=v_bs_uhf_list, ene_ump2_list=ene_bs_ump2_list, tol=1e-8, method=1, ref=ene_fci)
