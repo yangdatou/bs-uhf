@@ -199,6 +199,9 @@ def truncate_generalized_eigen_problem(h, s, tol=1e-8):
         print("Warning: truncation error is large")
         print("tol = %8.4e, trunc_err = %8.4e: %d -> %d" % (tol, trunc_err, n0, n1))
 
+    if n0 != n1:
+        print("tol = %8.4e, trunc_err = %8.4e: %d -> %d" % (tol, trunc_err, n0, n1))
+
     heff = reduce(numpy.dot, (u.T, h, vh.T))
     seff = reduce(numpy.dot, (u.T, s, vh.T))
 
@@ -207,9 +210,6 @@ def truncate_generalized_eigen_problem(h, s, tol=1e-8):
 def solve_variational_noci(v1, hv1, v2=None, tol=1e-8, ref=None):
     v1_dot_v1  = numpy.einsum('Iab,Jab->IJ', v1, v1)
     v1_dot_hv1 = numpy.einsum('Iab,Jab->IJ', v1, hv1)
-
-    dump_rec(stdout, v1_dot_v1)
-    dump_rec(stdout, v1_dot_hv1)
 
     res  = truncate_generalized_eigen_problem(v1_dot_hv1, v1_dot_v1, tol=tol)
     heff = res[0]
@@ -223,7 +223,6 @@ def solve_variational_noci(v1, hv1, v2=None, tol=1e-8, ref=None):
         dump_rec(stdout, heff)
 
     ene_noci, vec_noci = scipy.linalg.eigh(heff, seff)
-    print("ene_noci = ", ene_noci)
     gs_idx = numpy.argmin(ene_noci)
     ene_noci = ene_noci[gs_idx]
 
