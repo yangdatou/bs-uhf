@@ -172,10 +172,14 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
     ene_rhf   = rhf_obj.energy_elec()[0]
     assert rhf_obj.converged
 
+    ovlp_ao = rhf_obj.get_ovlp()
     norb = coeff_rhf.shape[1]
     h1e  = reduce(numpy.dot, (coeff_rhf.conj().T, rhf_obj.get_hcore(), coeff_rhf))
     h2e  = ao2mo.kernel(rhf_obj._eri, coeff_rhf)
     ham  = absorb_h1e(h1e, h2e, norb, (nelec_alph, nelec_beta), .5)
+
+    def s2_from_fcivec(fcivec):
+        return spin_square(fcivec, norb, (nelec_alph, nelec_beta), mo_coeff=coeff_rhf, ovlp=ovlp_ao)
 
     mp2_obj   = mp.RMP2(rhf_obj)
     ene_rmp2  = mp2_obj.kernel()[0] + ene_rhf
@@ -248,9 +252,9 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
         data_dict["ene_bs_ump2_%s" % idx]  = ene_bs_ump2
         data_dict["ene_bs_ucisd_%s" % idx] = ene_bs_ucisd
 
-        data_dict["s2_bs_uhf_%s" % idx]    = spin_square(vfci_bs_uhf, norb, (nelec_alph, nelec_beta))[0]
-        data_dict["s2_bs_ump2_%s" % idx]   = spin_square(vfci_bs_ump2, norb, (nelec_alph, nelec_beta))[0]
-        data_dict["s2_bs_ucisd_%s" % idx]  = spin_square(vfci_bs_ucisd, norb, (nelec_alph, nelec_beta))[0]
+        data_dict["s2_bs_uhf_%s" % idx]    = s2_from_fcivec(vfci_bs_uhf)
+        data_dict["s2_bs_ump2_%s" % idx]   = s2_from_fcivec(vfci_bs_ump2)
+        data_dict["s2_bs_ucisd_%s" % idx]  = s2_from_fcivec(fcivec_bs_ucisd)
 
     ene_noci_uhf, vfci_noci_uhf        = solve_uhf_noci(v_bs_uhf_list,  hv_bs_uhf_list, ene_bs_uhf_list, tol=1e-8)
     ene_noci_ump2_1, vfci_noci_ump2_1  = solve_ump2_noci(v_bs_ump2_list, hv_bs_ump2_list, v_bs_uhf_list=v_bs_uhf_list, ene_ump2_list=ene_bs_ump2_list, tol=1e-8, method=1, ref=ene_fci)
@@ -265,13 +269,9 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
     # data_dict["ene_noci_ucisd_1"] = ene_noci_ucisd_1
     # data_dict["ene_noci_ucisd_2"] = ene_noci_ucisd_2
     
-    dump_rec(stdout, vfci_noci_uhf)
-    print("S2 NOCI UHF")
-    print(numpy.einsum("ab,ab", vfci_noci_uhf, vfci_noci_uhf))
-    print(spin_square(vfci_noci_uhf, norb, (nelec_alph, nelec_beta), mo_coeff=coeff_rhf)[0])
-    data_dict["s2_noci_uhf"]     = spin_square(vfci_noci_uhf, norb, (nelec_alph, nelec_beta), mo_coeff=coeff_rhf)[0]
-    data_dict["s2_noci_ump2_1"]  = spin_square(vfci_noci_ump2_1, norb, (nelec_alph, nelec_beta), mo_coeff=coeff_rhf)[0]
-    data_dict["s2_noci_ump2_2"]  = spin_square(vfci_noci_ump2_2, norb, (nelec_alph, nelec_beta), mo_coeff=coeff_rhf)[0]
+    data_dict["s2_noci_uhf"]     = s2_from_fcivec(vfci_noci_uhf)
+    data_dict["s2_noci_ump2_1"]  = s2_from_fcivec(vfci_noci_ump2_1)
+    data_dict["s2_noci_ump2_2"]  = s2_from_fcivec(fcivec_noci_ump2_2)
 
     print("r = %6.4f, ene_fci = %12.6f, ene_noci_uhf = %12.6f, ene_noci_ump2_1 = %12.6f" % (r, ene_fci, ene_noci_uhf, ene_noci_ump2_1))
 
