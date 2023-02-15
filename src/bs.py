@@ -195,6 +195,9 @@ def truncate_generalized_eigen_problem(h, s, tol=1e-8):
     n1 = vh.shape[0]
     trunc_err = numpy.linalg.norm(s - reduce(numpy.dot, (u, numpy.diag(e), vh)))
 
+    tmp = ", ".join([f"{x : 12.8f}" for x in e])
+    print(f"e = [{tmp}]")
+
     if not trunc_err < tol:
         print("Warning: truncation error is large")
         print("tol = %8.4e, trunc_err = %8.4e: %d -> %d" % (tol, trunc_err, n0, n1))
