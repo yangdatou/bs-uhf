@@ -179,7 +179,7 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
     ham  = absorb_h1e(h1e, h2e, norb, (nelec_alph, nelec_beta), .5)
 
     def s2_from_fcivec(fcivec):
-        return spin_square(fcivec, norb, (nelec_alph, nelec_beta), mo_coeff=coeff_rhf, ovlp=ovlp_ao)
+        return spin_square(fcivec, norb, (nelec_alph, nelec_beta), mo_coeff=coeff_rhf, ovlp=ovlp_ao)[0]
 
     mp2_obj   = mp.RMP2(rhf_obj)
     ene_rmp2  = mp2_obj.kernel()[0] + ene_rhf
