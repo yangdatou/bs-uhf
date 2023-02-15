@@ -5,6 +5,7 @@ import os, sys, numpy, scipy
 from pyscf import gto, scf, fci
 from pyscf import mp, ao2mo, ci
 from pyscf.lib import chkfile
+from pyscf.fci.spin_op import spin_square
 from pyscf.fci.direct_spin1 import absorb_h1e, contract_2e
 
 from pyscf.tools.dump_mat import dump_rec
@@ -201,6 +202,8 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
         "ene_rcisd": ene_rcisd,
         "ene_ucisd": ene_ucisd,
         "ene_fci"  : ene_fci,
+        "s2_rhf"   : uhf_obj.spin_square()[0],
+        "s2_uhf"   : uhf_obj.spin_square()[0],
     }
 
     ene_bs_uhf_list    = []
@@ -219,12 +222,6 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
     for idx, alph_ao_idx in enumerate(alph_ao_idx_comb):
         alph_ao_idx = list(alph_ao_idx)
         beta_ao_idx = list(set(bs_ao_idx) - set(alph_ao_idx))
-
-        print("idx = %d" % idx)
-        for i in alph_ao_idx:
-            print("alph %d" % i, mol.ao_labels()[i])
-        for i in beta_ao_idx:
-            print("beta %d" % i, mol.ao_labels()[i])
 
         dm0 = get_dm_bs(nao, core_ao_idx, alph_ao_idx, beta_ao_idx)
         ene_bs_uhf_ref, coeff_bs_uhf = get_coeff_uhf(uhf_obj, dm0, is_scf=is_scf)
@@ -250,9 +247,13 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
         data_dict["ene_bs_ump2_%s" % idx]  = ene_bs_ump2
         data_dict["ene_bs_ucisd_%s" % idx] = ene_bs_ucisd
 
-    ene_noci_uhf     = solve_uhf_noci(v_bs_uhf_list,  hv_bs_uhf_list, ene_bs_uhf_list, tol=1e-8)
-    ene_noci_ump2_1  = solve_ump2_noci(v_bs_ump2_list, hv_bs_ump2_list, v_bs_uhf_list=v_bs_uhf_list, ene_ump2_list=ene_bs_ump2_list, tol=1e-8, method=1, ref=ene_fci)
-    ene_noci_ump2_2  = solve_ump2_noci(v_bs_ump2_list, hv_bs_ump2_list, v_bs_uhf_list=v_bs_uhf_list, ene_ump2_list=ene_bs_ump2_list, tol=1e-6, method=2, ref=ene_fci)
+        data_dict["s2_bs_uhf_%s" % idx]    = spin_square(vfci_bs_uhf, norb, (nelec_alph, nelec_beta))[0]
+        data_dict["s2_bs_ump2_%s" % idx]   = spin_square(vfci_bs_ump2, norb, (nelec_alph, nelec_beta))[0]
+        data_dict["s2_bs_ucisd_%s" % idx]  = spin_square(vfci_bs_ucisd, norb, (nelec_alph, nelec_beta))[0]
+
+    ene_noci_uhf, vfci_noci_uhf        = solve_uhf_noci(v_bs_uhf_list,  hv_bs_uhf_list, ene_bs_uhf_list, tol=1e-8)
+    ene_noci_ump2_1, vfci_noci_ump2_1  = solve_ump2_noci(v_bs_ump2_list, hv_bs_ump2_list, v_bs_uhf_list=v_bs_uhf_list, ene_ump2_list=ene_bs_ump2_list, tol=1e-8, method=1, ref=ene_fci)
+    ene_noci_ump2_2, vfci_noci_ump2_2  = solve_ump2_noci(v_bs_ump2_list, hv_bs_ump2_list, v_bs_uhf_list=v_bs_uhf_list, ene_ump2_list=ene_bs_ump2_list, tol=1e-6, method=2, ref=ene_fci)
     # ene_noci_ucisd_1 = solve_ucisd_noci(v_bs_ucisd_list, hv_bs_ucisd_list, v_bs_uhf_list=v_bs_uhf_list, ene_ucisd_list=ene_bs_ucisd_list, tol=1e-8, method=1, ref=ene_fci)
     # print("Solve UCISD NOCI with method 2")
     # ene_noci_ucisd_2 = solve_ucisd_noci(v_bs_ucisd_list, hv_bs_ucisd_list, v_bs_uhf_list=v_bs_uhf_list, ene_ucisd_list=ene_bs_ucisd_list, tol=1e-6, method=2, ref=ene_fci)
@@ -262,6 +263,10 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
     data_dict["ene_noci_ump2_2"]  = ene_noci_ump2_2
     # data_dict["ene_noci_ucisd_1"] = ene_noci_ucisd_1
     # data_dict["ene_noci_ucisd_2"] = ene_noci_ucisd_2
+    
+    data_dict["s2_noci_uhf"]     = spin_square(vfci_noci_uhf, norb, (nelec_alph, nelec_beta), mo_coeff=coeff_rhf)[0]
+    data_dict["s2_noci_ump2_1"]  = spin_square(vfci_noci_ump2_1, norb, (nelec_alph, nelec_beta), mo_coeff=coeff_rhf)[0]
+    data_dict["s2_noci_ump2_2"]  = spin_square(vfci_noci_ump2_2, norb, (nelec_alph, nelec_beta), mo_coeff=coeff_rhf)[0]
 
     # print("r = %6.4f, ene_fci = %12.6f, ene_noci_uhf = %12.6f, ene_noci_ump2_1 = %12.6f, ene_noci_ucisd_1 = %12.6f" % (r, ene_fci, ene_noci_uhf, ene_noci_ump2_1, ene_noci_ucisd_1))
 

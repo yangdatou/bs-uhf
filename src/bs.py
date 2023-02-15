@@ -180,8 +180,8 @@ def solve_uhf_noci(v_bs_uhf_list, hv_bs_uhf_list, ene_bs_uhf_list, tol=1e-8):
         print("Warning: diagonal elements of v_uhf_dot_hv_ump2 is not ene_ump2_list")
         print(f"ene_err = {ene_err : 12.8e}")
 
-    ene_noci, fci_noci = solve_variational_noci(v_bs_uhf_list, hv_bs_uhf_list, tol=tol)
-    return ene_noci, fci_noci
+    ene_noci, vfci_noci = solve_variational_noci(v_bs_uhf_list, hv_bs_uhf_list, tol=tol)
+    return ene_noci, vfci_noci
 
 def truncate_generalized_eigen_problem(h, s, tol=1e-8):
     u, e, vh = scipy.linalg.svd(s)
@@ -227,9 +227,9 @@ def solve_variational_noci(v1, hv1, v2=None, tol=1e-8, ref=None):
         print("Warning: imaginary part of noci energy is large")
         print(f"ene_noci = {ene_noci.real : 20.12f} + {ene_noci.imag : 20.12f}i")
 
-    fci_noci = numpy.einsum('Iab,JI,JA->Aab', v1, vh, vec_noci, optimize=True)
-    fci_noci = fci_noci[gs_idx]
-    return ene_noci, fci_noci
+    vfci_noci = numpy.einsum('Iab,JI,JA->Aab', v1, vh, vec_noci, optimize=True)
+    vfci_noci = vfci_noci[gs_idx]
+    return ene_noci, vfci_noci
 
 def solve_projection_noci(v1, hv1, v2=None, tol=1e-8, ref=None):
     v2_dot_v1  = numpy.einsum('Iab,Jab->IJ', v2,  v1)
@@ -260,13 +260,13 @@ def solve_projection_noci(v1, hv1, v2=None, tol=1e-8, ref=None):
         print("Warning: imaginary part of noci energy is large")
         print(f"ene_noci = {ene_noci.real : 12.8f}{ene_noci.imag :+12.8f}i")
 
-    fci_noci = numpy.einsum('Iab,JI,JA->Aab', v1, vh, vec_noci, optimize=True)
-    fci_noci = fci_noci[gs_idx]
+    vfci_noci = numpy.einsum('Iab,JI,JA->Aab', v1, vh, vec_noci, optimize=True)
+    vfci_noci = vfci_noci[gs_idx]
 
-    if not numpy.linalg.norm(fci_noci.imag) < tol:
-        print("Warning: imaginary part of noci coefficients is large: %8.4e" % numpy.linalg.norm(fci_noci.imag))
+    if not numpy.linalg.norm(vfci_noci.imag) < tol:
+        print("Warning: imaginary part of noci coefficients is large: %8.4e" % numpy.linalg.norm(vfci_noci.imag))
 
-    return ene_noci.real, fci_noci.real
+    return ene_noci.real, vfci_noci.real
 
 def solve_ump2_noci(v_bs_list, hv_bs_list, v_bs_uhf_list=None, ene_ump2_list=None, tol=1e-8, ref=None, method=1):
     ene_ump2_list = numpy.asarray(ene_ump2_list)
@@ -300,15 +300,15 @@ def solve_ump2_noci(v_bs_list, hv_bs_list, v_bs_uhf_list=None, ene_ump2_list=Non
         v1  = v_bs_list
         hv1 = hv_bs_list
         v2  = v_bs_uhf_list
-        ene_noci = solve_variational_noci(v1, hv1, v2=v2, tol=tol, ref=ref)
+        ene_noci, vfci_noci = solve_variational_noci(v1, hv1, v2=v2, tol=tol, ref=ref)
 
     elif method == 2:
         v1  = v_bs_list
         hv1 = hv_bs_list
         v2  = v_bs_uhf_list
-        ene_noci = solve_projection_noci(v1, hv1, v2=v2, tol=tol, ref=ref)
+        ene_noci, vfci_noci = solve_projection_noci(v1, hv1, v2=v2, tol=tol, ref=ref)
 
-    return ene_noci
+    return ene_noci, vfci_noci
 
 def solve_ucisd_noci(v_bs_list, hv_bs_list, v_bs_uhf_list=None, ene_ucisd_list=None, tol=1e-8, ref=None, method=1):
     ene_ucisd_list = numpy.asarray(ene_ucisd_list)
@@ -342,12 +342,12 @@ def solve_ucisd_noci(v_bs_list, hv_bs_list, v_bs_uhf_list=None, ene_ucisd_list=N
         v1  = v_bs_list
         hv1 = hv_bs_list
         v2  = v_bs_uhf_list
-        ene_noci = solve_variational_noci(v1, hv1, v2=v2, tol=tol, ref=ref)
+        ene_noci, vfci_noci = solve_variational_noci(v1, hv1, v2=v2, tol=tol, ref=ref)
 
     elif method == 2:
         v1  = v_bs_list
         hv1 = hv_bs_list
         v2  = v_bs_uhf_list
-        ene_noci = solve_projection_noci(v1, hv1, v2=v2, tol=tol, ref=ref)
+        ene_noci, vfci_noci = solve_projection_noci(v1, hv1, v2=v2, tol=tol, ref=ref)
 
-    return ene_noci
+    return ene_noci, vfci_noci
