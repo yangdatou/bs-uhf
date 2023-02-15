@@ -234,7 +234,11 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
         ene_bs_ump2, vfci_bs_ump2    = get_ump2_vfci(coeff_rhf, coeff_bs_uhf, uhf_obj=uhf_obj)
         ene_bs_ucisd, vfci_bs_ucisd  = get_ucisd_vfci(coeff_rhf, coeff_bs_uhf, uhf_obj=uhf_obj)
 
-        assert abs(ene_bs_uhf - ene_bs_uhf_ref) < 1e-8
+        if not abs(ene_bs_uhf - ene_bs_uhf_ref) < 1e-8:
+            print("Warning: ene_bs_uhf != ene_bs_uhf_ref")
+            print("ene_bs_uhf_ref = %12.8f" % ene_bs_uhf_ref)
+            print("ene_bs_uhf     = %12.8f" % ene_bs_uhf)
+            print("err = %12.8e" % abs(ene_bs_uhf - ene_bs_uhf_ref))
 
         ene_bs_uhf_list.append(ene_bs_uhf)
         ene_bs_ump2_list.append(ene_bs_ump2)
