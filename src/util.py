@@ -188,11 +188,13 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
     ene_ump2  = mp2_obj.kernel()[0] + ene_uhf
 
     cisd_obj  = ci.CISD(rhf_obj)
-    cisd_obj.max_cycle = 500
+    cisd_obj.max_cycle = 50000
+    cisd_obj.max_space = 1000
     ene_rcisd = cisd_obj.kernel()[0] + ene_rhf
 
     cisd_obj  = ci.CISD(uhf_obj)
-    cisd_obj.max_cycle = 500
+    cisd_obj.max_cycle = 50000
+    cisd_obj.max_space = 1000
     ene_ucisd = cisd_obj.kernel()[0] + ene_uhf
 
     ene_fci   = fci.FCI(rhf_obj).kernel()[0] - ene_nuc
@@ -232,7 +234,7 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
         ene_bs_uhf_ref, coeff_bs_uhf = get_coeff_uhf(uhf_obj, dm0, is_scf=is_scf)
         ene_bs_uhf, vfci_bs_uhf      = get_uhf_vfci(coeff_rhf, coeff_bs_uhf, uhf_obj=uhf_obj)
         ene_bs_ump2, vfci_bs_ump2    = get_ump2_vfci(coeff_rhf, coeff_bs_uhf, uhf_obj=uhf_obj)
-        ene_bs_ucisd, vfci_bs_ucisd  = get_ucisd_vfci(coeff_rhf, coeff_bs_uhf, uhf_obj=uhf_obj)
+        # ene_bs_ucisd, vfci_bs_ucisd  = get_ucisd_vfci(coeff_rhf, coeff_bs_uhf, uhf_obj=uhf_obj)
 
         if not abs(ene_bs_uhf - ene_bs_uhf_ref) < 1e-8:
             print("Warning: ene_bs_uhf != ene_bs_uhf_ref")
