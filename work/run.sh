@@ -3,7 +3,7 @@
 #SBATCH --time=01:00:00
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=28
-#SBATCH --job-name=tccsd-rdm1
+#SBATCH --job-name=BS-NOCI
 #SBATCH --mem=0
 
 module purge
