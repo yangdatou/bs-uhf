@@ -174,7 +174,7 @@ def solve_uhf_noci(v_bs_uhf_list, hv_bs_uhf_list, ene_bs_uhf_list, tol=1e-8):
         print("Warning: diagonal elements of v_uhf_dot_v_ump2 is not 1.0")
         print(f"diag_err = {diag_err : 12.8e}")
 
-    ene_err = numpy.diag(v_dot_hv) / numpy.diag(v_dot_v) - ene_bs_uhf_list
+    ene_err = numpy.diag(v_dot_hv) - ene_bs_uhf_list
     ene_err = numpy.linalg.norm(ene_err)
     if not ene_err < tol:
         print("Warning: diagonal elements of v_uhf_dot_hv_ump2 is not ene_ump2_list")
@@ -207,6 +207,8 @@ def truncate_generalized_eigen_problem(h, s, tol=1e-8):
 def solve_variational_noci(v1, hv1, v2=None, tol=1e-8, ref=None):
     v1_dot_v1  = numpy.einsum('Iab,Jab->IJ', v1, v1)
     v1_dot_hv1 = numpy.einsum('Iab,Jab->IJ', v1, hv1)
+
+    dump_rec(stdout, v1_dot_v1)
 
     res  = truncate_generalized_eigen_problem(v1_dot_hv1, v1_dot_v1, tol=tol)
     heff = res[0]
