@@ -35,13 +35,13 @@ def get_plot_data(filename):
     with h5py.File(filename, "r") as f:
         data = {}
         keys = f.keys()
-        
 
         for key in keys:
             
             r_dict  = f[key]
             
             for k, v in r_dict.items():
+                print("Reading data from: ", k)
                 if k not in data_dict:
                     data_dict[k] = []
                 data_dict[k].append((float(key), float(v[()])))

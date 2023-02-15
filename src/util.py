@@ -202,7 +202,7 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
         "ene_rcisd": ene_rcisd,
         "ene_ucisd": ene_ucisd,
         "ene_fci"  : ene_fci,
-        "s2_rhf"   : uhf_obj.spin_square()[0],
+        "s2_rhf"   : rhf_obj.spin_square()[0],
         "s2_uhf"   : uhf_obj.spin_square()[0],
     }
 
