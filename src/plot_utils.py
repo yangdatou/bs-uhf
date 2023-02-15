@@ -23,8 +23,9 @@ params = {
 }
 mpl.rcParams.update(params)
 
-colors  = ["f94144","f3722c","f8961e","f9844a","f9c74f","90be6d","43aa8b","4d908e","577590","277da1"]
-colors  = [f"#{color}" for color in colors]
+# colors  = ["f94144","f3722c","f8961e","f9844a","f9c74f","90be6d","43aa8b","4d908e","577590","277da1"]
+# colors  = [f"#{color}" for color in colors]
+colors  = ["tab:blue", "tab:orange", "tab:green", "tab:red", "tab:purple", "tab:pink", "tab:olive", "tab:cyan"]
 
 def get_plot_data(filename):
     import h5py
