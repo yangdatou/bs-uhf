@@ -1,0 +1,86 @@
+ 
+:: initializing oneAPI environment ...
+   slurm_script: BASH_VERSION = 4.2.46(1)-release
+   args: Using "$@" for setvars.sh arguments: --force
+:: advisor -- latest
+:: ccl -- latest
+:: clck -- latest
+:: compiler -- latest
+:: dal -- latest
+:: debugger -- latest
+:: dev-utilities -- latest
+:: dnnl -- latest
+:: dpcpp-ct -- latest
+:: dpl -- latest
+:: inspector -- latest
+:: intelpython -- latest
+:: ipp -- latest
+:: ippcp -- latest
+:: ipp -- latest
+:: itac -- latest
+:: mkl -- latest
+:: mpi -- latest
+:: tbb -- latest
+:: vpl -- latest
+:: vtune -- latest
+:: oneAPI environment initialized ::
+ 
+
+
+####################
+m        = n2
+basis    = sto-3g
+dir_path = ./data/
+h5_path  = ./data/n2-sto-3g.h5
+is_scf   = False
+tol = 1.0000e-06, trunc_err = 8.6682e-08: 20 -> 19
+r = 0.8000, ene_fci =  -139.178412, ene_noci_uhf =  -139.125025, ene_noci_ump2_1 =  -139.174018
+tol = 1.0000e-06, trunc_err = 4.9538e-08: 20 -> 19
+Warning: imaginary part of noci energy is large
+ene_noci = -137.71258437 -0.08199353i
+Warning: imaginary part of noci coefficients is large: 1.3084e-02
+r = 0.8550, ene_fci =  -137.426302, ene_noci_uhf =  -137.367987, ene_noci_ump2_1 =  -137.421082
+tol = 1.0000e-08, trunc_err = 3.1990e-09: 20 -> 19
+tol = 1.0000e-06, trunc_err = 1.2722e-08: 20 -> 19
+Warning: imaginary part of noci energy is large
+ene_noci = -135.94838922 +0.12252005i
+Warning: imaginary part of noci coefficients is large: 8.7672e-02
+r = 0.9100, ene_fci =  -135.822552, ene_noci_uhf =  -135.759410, ene_noci_ump2_1 =  -135.816510
+tol = 1.0000e-08, trunc_err = 5.3940e-09: 20 -> 19
+tol = 1.0000e-08, trunc_err = 1.4196e-10: 20 -> 19
+tol = 1.0000e-06, trunc_err = 1.7124e-07: 20 -> 18
+r = 0.9650, ene_fci =  -134.351778, ene_noci_uhf =  -134.284037, ene_noci_ump2_1 =  -134.344865
+r = 1.0200, ene_fci =  -133.000850, ene_noci_uhf =  -132.929054, ene_noci_ump2_1 =  -132.990228
+r = 1.0750, ene_fci =  -131.758310, ene_noci_uhf =  -131.682102, ene_noci_ump2_1 =  -131.745618
+r = 1.1300, ene_fci =  -130.614001, ene_noci_uhf =  -130.534099, ene_noci_ump2_1 =  -130.598695
+r = 1.1850, ene_fci =  -129.558818, ene_noci_uhf =  -129.476340, ene_noci_ump2_1 =  -129.540468
+r = 1.2400, ene_fci =  -128.584548, ene_noci_uhf =  -128.500971, ene_noci_ump2_1 =  -128.562974
+r = 1.2950, ene_fci =  -127.683763, ene_noci_uhf =  -127.600814, ene_noci_ump2_1 =  -127.659135
+r = 1.3500, ene_fci =  -126.849746, ene_noci_uhf =  -126.769234, ene_noci_ump2_1 =  -126.822616
+r = 1.4050, ene_fci =  -126.076437, ene_noci_uhf =  -126.000064, ene_noci_ump2_1 =  -126.047684
+r = 1.4600, ene_fci =  -125.358392, ene_noci_uhf =  -125.287572, ene_noci_ump2_1 =  -125.329088
+r = 1.5150, ene_fci =  -124.690747, ene_noci_uhf =  -124.626459, ene_noci_ump2_1 =  -124.661971
+r = 1.5700, ene_fci =  -124.069166, ene_noci_uhf =  -124.018466, ene_noci_ump2_1 =  -124.044980
+r = 1.6250, ene_fci =  -123.489783, ene_noci_uhf =  -123.447636, ene_noci_ump2_1 =  -123.468817
+r = 1.6800, ene_fci =  -122.949118, ene_noci_uhf =  -122.915060, ene_noci_ump2_1 =  -122.931754
+r = 1.7350, ene_fci =  -122.443995, ene_noci_uhf =  -122.417164, ene_noci_ump2_1 =  -122.430208
+r = 1.7900, ene_fci =  -121.971468, ene_noci_uhf =  -121.950777, ene_noci_ump2_1 =  -121.960918
+r = 1.8450, ene_fci =  -121.528772, ene_noci_uhf =  -121.513077, ene_noci_ump2_1 =  -121.520946
+r = 1.9000, ene_fci =  -121.113315, ene_noci_uhf =  -121.101544, ene_noci_ump2_1 =  -121.107650
+r = 1.9550, ene_fci =  -120.722687, ene_noci_uhf =  -120.713912, ene_noci_ump2_1 =  -120.718657
+r = 2.0100, ene_fci =  -120.354675, ene_noci_uhf =  -120.348141, ene_noci_ump2_1 =  -120.351840
+r = 2.0650, ene_fci =  -120.007274, ene_noci_uhf =  -120.002395, ene_noci_ump2_1 =  -120.005289
+r = 2.1200, ene_fci =  -119.678686, ene_noci_uhf =  -119.675019, ene_noci_ump2_1 =  -119.677294
+r = 2.1750, ene_fci =  -119.367311, ene_noci_uhf =  -119.364532, ene_noci_ump2_1 =  -119.366330
+r = 2.2300, ene_fci =  -119.071734, ene_noci_uhf =  -119.069607, ene_noci_ump2_1 =  -119.071034
+r = 2.2850, ene_fci =  -118.790701, ene_noci_uhf =  -118.789056, ene_noci_ump2_1 =  -118.790195
+r = 2.3400, ene_fci =  -118.523102, ene_noci_uhf =  -118.521818, ene_noci_ump2_1 =  -118.522731
+r = 2.3950, ene_fci =  -118.267951, ene_noci_uhf =  -118.266939, ene_noci_ump2_1 =  -118.267673
+r = 2.4500, ene_fci =  -118.024364, ene_noci_uhf =  -118.023560, ene_noci_ump2_1 =  -118.024152
+r = 2.5050, ene_fci =  -117.791550, ene_noci_uhf =  -117.790907, ene_noci_ump2_1 =  -117.791387
+r = 2.5600, ene_fci =  -117.568797, ene_noci_uhf =  -117.568279, ene_noci_ump2_1 =  -117.568668
+r = 2.6150, ene_fci =  -117.354527, ene_noci_uhf =  -117.355036, ene_noci_ump2_1 =  -117.355351
+r = 2.6700, ene_fci =  -117.150912, ene_noci_uhf =  -117.150594, ene_noci_ump2_1 =  -117.150851
+r = 2.7250, ene_fci =  -116.954681, ene_noci_uhf =  -116.954419, ene_noci_ump2_1 =  -116.954628
+r = 2.7800, ene_fci =  -116.766143, ene_noci_uhf =  -116.766019, ene_noci_ump2_1 =  -116.766190
+r = 2.8350, ene_fci =  -116.585052, ene_noci_uhf =  -116.584941, ene_noci_ump2_1 =  -116.585081
