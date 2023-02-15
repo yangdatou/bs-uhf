@@ -244,15 +244,15 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
 
         ene_bs_uhf_list.append(ene_bs_uhf)
         ene_bs_ump2_list.append(ene_bs_ump2)
-        ene_bs_ucisd_list.append(ene_bs_ucisd)
+        # ene_bs_ucisd_list.append(ene_bs_ucisd)
 
         v_bs_uhf_list.append(vfci_bs_uhf)
         v_bs_ump2_list.append(vfci_bs_ump2)
-        v_bs_ucisd_list.append(vfci_bs_ucisd)
+        # v_bs_ucisd_list.append(vfci_bs_ucisd)
 
         hv_bs_uhf_list.append(contract_2e(ham, vfci_bs_uhf, norb, (nelec_alph, nelec_beta)))
         hv_bs_ump2_list.append(contract_2e(ham, vfci_bs_ump2, norb, (nelec_alph, nelec_beta)))
-        hv_bs_ucisd_list.append(contract_2e(ham, vfci_bs_ucisd, norb, (nelec_alph, nelec_beta)))
+        # hv_bs_ucisd_list.append(contract_2e(ham, vfci_bs_ucisd, norb, (nelec_alph, nelec_beta)))
 
         data_dict["ene_bs_uhf_%s" % idx]   = ene_bs_uhf
         data_dict["ene_bs_ump2_%s" % idx]  = ene_bs_ump2
