@@ -84,3 +84,6 @@ r = 2.6700, ene_fci =  -117.150912, ene_noci_uhf =  -117.150594, ene_noci_ump2_1
 r = 2.7250, ene_fci =  -116.954681, ene_noci_uhf =  -116.954419, ene_noci_ump2_1 =  -116.954628
 r = 2.7800, ene_fci =  -116.766143, ene_noci_uhf =  -116.766019, ene_noci_ump2_1 =  -116.766190
 r = 2.8350, ene_fci =  -116.585052, ene_noci_uhf =  -116.584941, ene_noci_ump2_1 =  -116.585081
+r = 2.8900, ene_fci =  -116.410790, ene_noci_uhf =  -116.410767, ene_noci_ump2_1 =  -116.410882
+r = 2.9450, ene_fci =  -116.243221, ene_noci_uhf =  -116.243110, ene_noci_ump2_1 =  -116.243205
+r = 3.0000, ene_fci =  -116.081575, ene_noci_uhf =  -116.081611, ene_noci_ump2_1 =  -116.081689
