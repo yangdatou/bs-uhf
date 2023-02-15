@@ -175,7 +175,7 @@ def solve_uhf_noci(v_bs_uhf_list, hv_bs_uhf_list, ene_bs_uhf_list, tol=1e-8):
         print("Warning: diagonal elements of v_uhf_dot_hv_ump2 is not ene_ump2_list")
         print(f"ene_err = {ene_err : 12.8e}")
 
-    res  = truncate_generalized_eigen_problem(v1_dot_hv1, v1_dot_v1, tol=tol)
+    res  = truncate_generalized_eigen_problem(v_dot_hv, v_dot_v, tol=tol)
     heff = res[0]
     seff = res[1]
 
