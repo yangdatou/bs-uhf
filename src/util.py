@@ -206,9 +206,6 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
         "s2_uhf"   : uhf_obj.spin_square()[0],
     }
 
-    print(data_dict["s2_rhf"])
-    assert 1 == 2
-
     ene_bs_uhf_list    = []
     ene_bs_ump2_list   = []
     ene_bs_ucisd_list  = []
