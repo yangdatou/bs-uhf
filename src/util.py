@@ -264,7 +264,7 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
 
     ene_noci_uhf, vfci_noci_uhf        = solve_uhf_noci(v_bs_uhf_list,  hv_bs_uhf_list, ene_bs_uhf_list, tol=1e-8)
     ene_noci_ump2_1, vfci_noci_ump2_1  = solve_ump2_noci(v_bs_ump2_list, hv_bs_ump2_list, v_bs_uhf_list=v_bs_uhf_list, ene_ump2_list=ene_bs_ump2_list, tol=1e-8, method=1, ref=ene_fci)
-    ene_noci_ump2_2, vfci_noci_ump2_2  = solve_ump2_noci(v_bs_ump2_list, hv_bs_ump2_list, v_bs_uhf_list=v_bs_uhf_list, ene_ump2_list=ene_bs_ump2_list, tol=1e-3, method=2, ref=ene_fci)
+    ene_noci_ump2_2, vfci_noci_ump2_2  = solve_ump2_noci(v_bs_ump2_list, hv_bs_ump2_list, v_bs_uhf_list=v_bs_uhf_list, ene_ump2_list=ene_bs_ump2_list, tol=1e-2, method=2, ref=ene_fci)
     # ene_noci_ucisd_1 = solve_ucisd_noci(v_bs_ucisd_list, hv_bs_ucisd_list, v_bs_uhf_list=v_bs_uhf_list, ene_ucisd_list=ene_bs_ucisd_list, tol=1e-8, method=1, ref=ene_fci)
     # print("Solve UCISD NOCI with method 2")
     # ene_noci_ucisd_2 = solve_ucisd_noci(v_bs_ucisd_list, hv_bs_ucisd_list, v_bs_uhf_list=v_bs_uhf_list, ene_ucisd_list=ene_bs_ucisd_list, tol=1e-6, method=2, ref=ene_fci)
