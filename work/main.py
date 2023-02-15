@@ -3,7 +3,7 @@ from pyscf.lib import chkfile
 
 from util import solve_bs_noci
 
-def main(m, basis, dir_path, h5_path, x_list):
+def main(m, basis, dir_path, h5_path, x_list, is_scf=False):
     if not os.path.exists(dir_path):
         os.makedirs(dir_path, exist_ok=True)
 
@@ -16,8 +16,9 @@ def main(m, basis, dir_path, h5_path, x_list):
     print("basis    = %s" % basis)
     print("dir_path = %s" % dir_path)
     print("h5_path  = %s" % h5_path)
+    print("is_scf   = %s" % is_scf)
     for x in x_list:
-        data_dict = solve_bs_noci(x, basis=basis, m=m)
+        data_dict = solve_bs_noci(x, basis=basis, m=m, is_scf=is_scf)
         chkfile.save(h5_path, "%12.8f" % x, data_dict)
 
 if __name__ == "__main__":
