@@ -169,22 +169,21 @@ def solve_uhf_noci(v_bs_uhf_list, hv_bs_uhf_list, ene_bs_uhf_list, tol=1e-8):
     v_dot_v  = numpy.einsum('Iab,Jab->IJ', v_bs_uhf_list, v_bs_uhf_list)
     v_dot_hv = numpy.einsum('Iab,Jab->IJ', v_bs_uhf_list, hv_bs_uhf_list)
 
-    dump_rec(stdout, v_dot_v)
-
     ene_err = numpy.diag(v_dot_hv) / numpy.diag(v_dot_v) - ene_bs_uhf_list
     ene_err = numpy.linalg.norm(ene_err)
     if not ene_err < tol:
         print("Warning: diagonal elements of v_uhf_dot_hv_ump2 is not ene_ump2_list")
         print(f"ene_err = {ene_err : 12.8e}")
 
-    eigvals, eigvecs = scipy.linalg.eigh(v_dot_hv, v_dot_v)
-    mask = numpy.abs(eigvals) > tol
+    res  = truncate_generalized_eigen_problem(v1_dot_hv1, v1_dot_v1, tol=tol)
+    heff = res[0]
+    seff = res[1]
 
-    eigvals = eigvals[mask]
-    eigvecs = eigvecs[:,mask]
-
-    heff = reduce(numpy.dot, (eigvecs.T, v_dot_hv, eigvecs))
-    seff = reduce(numpy.dot, (eigvecs.T, v_dot_v, eigvecs))
+    is_symmetric = numpy.allclose(heff, heff.T, atol=tol)
+    if not is_symmetric:
+        print("Warning: heff is not symmetric, please check")
+        print("heff = ")
+        dump_rec(stdout, heff)
 
     ene_noci, vec_noci = scipy.linalg.eigh(heff, seff)
     return ene_noci[0]
