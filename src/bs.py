@@ -187,16 +187,22 @@ def truncate_generalized_eigen_problem(h, s, tol=1e-8):
     u, e, vh = scipy.linalg.svd(s)
     mask = numpy.abs(e) > tol
 
+    n0 = s.shape[0]
+    tmp = ""
+    for i in range(n0):
+        tmp += "%8.4e, " % e[i]
+        if i % 5 == 4:
+            tmp = tmp[-1] + "\n"
+    if tmp[-1] == ",":
+        tmp = tmp[:-1]
+    print(tmp)
+
     u   = u[:,mask]
     e   = e[mask]
     vh  = vh[mask,:]
-
-    n0 = s.shape[0]
+    
     n1 = vh.shape[0]
     trunc_err = numpy.linalg.norm(s - reduce(numpy.dot, (u, numpy.diag(e), vh)))
-
-    tmp = ", ".join([f"{x : 12.4e}" for x in e])
-    print(f"e = [{tmp}]")
 
     if not trunc_err < tol:
         print("Warning: truncation error is large")
