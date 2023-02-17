@@ -3,13 +3,14 @@ from functools import reduce
 import os, sys, numpy, scipy
 from sys import stdout
 
-from pyscf import gto, scf, fci
-from pyscf import mp, ao2mo, ci
+from pyscf import gto, scf, lo
+from pyscf import fci, mp, ao2mo, ci
 from pyscf.lib import chkfile
 from pyscf.fci.spin_op import spin_square
 from pyscf.fci.direct_spin1 import absorb_h1e, contract_2e
 
 from pyscf.tools.dump_mat import dump_rec
+from pyscf.tools import cubegen
 
 from bs import get_coeff_uhf, get_uhf_vfci
 from bs import get_ump2_vfci, get_ucisd_vfci
@@ -57,7 +58,14 @@ def get_mol(r, basis="sto-3g", m="h2"):
     mol.verbose = 0
     mol.build()
 
-    return mol
+    coeff_ao_lo = lo.orth_ao(mol, 'meta_lowdin')
+    nao, nlo = coeff_ao_lo.shape
+
+    for p in range(nlo):
+        max_ao_idx = numpy.argmax(numpy.abs(coeff_ao_lo[:, p]))
+        assert max_ao_idx == p
+
+    return mol, coeff_ao_lo
 
 def solve_rhf(mol, dm0=None):
     rhf_obj = scf.RHF(mol)
@@ -137,10 +145,12 @@ def get_bs_uhf_ao_label(mol=None, m=None):
 
     return core_ao_idx, alph_ao_idx, beta_ao_idx
 
-def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
-    mol     = get_mol(r, m=m, basis=basis)
-    nao     = mol.nao
-    ene_nuc = mol.energy_nuc()
+def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False, tmp_dir=None):
+    res = get_mol(r, m=m, basis=basis)
+    mol = res[0]
+    coeff_ao_lo = res[1]
+    nao, nlo = coeff_ao_lo.shape
+    ene_nuc  = mol.energy_nuc()
 
     nelec_alph, nelec_beta = mol.nelec
     nelec     = nelec_alph + nelec_beta
@@ -173,13 +183,13 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
     assert rhf_obj.converged
 
     ovlp_ao = rhf_obj.get_ovlp()
-    norb = coeff_rhf.shape[1]
-    h1e  = reduce(numpy.dot, (coeff_rhf.conj().T, rhf_obj.get_hcore(), coeff_rhf))
-    h2e  = ao2mo.kernel(rhf_obj._eri, coeff_rhf)
+    norb = coeff_ao_lo.shape[1]
+    h1e  = reduce(numpy.dot, (coeff_ao_lo.conj().T, rhf_obj.get_hcore(), coeff_ao_lo))
+    h2e  = ao2mo.kernel(rhf_obj._eri, coeff_ao_lo)
     ham  = absorb_h1e(h1e, h2e, norb, (nelec_alph, nelec_beta), .5)
 
     def s2_from_fcivec(fcivec):
-        return spin_square(fcivec, norb, (nelec_alph, nelec_beta), mo_coeff=coeff_rhf, ovlp=ovlp_ao)[0]
+        return spin_square(fcivec, norb, (nelec_alph, nelec_beta), mo_coeff=coeff_ao_lo, ovlp=ovlp_ao)[0]
 
     mp2_obj   = mp.RMP2(rhf_obj)
     ene_rmp2  = mp2_obj.kernel()[0] + ene_rhf
@@ -230,9 +240,26 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
         alph_ao_idx = list(alph_ao_idx)
         beta_ao_idx = list(set(bs_ao_idx) - set(alph_ao_idx))
 
-        dm0 = get_dm_bs(nao, core_ao_idx, alph_ao_idx, beta_ao_idx)
-        ene_bs_uhf_ref, coeff_bs_uhf = get_coeff_uhf(uhf_obj, dm0, is_scf=is_scf)
-        ene_bs_uhf, vfci_bs_uhf      = get_uhf_vfci(coeff_rhf, coeff_bs_uhf, uhf_obj=uhf_obj)
+        alph_occ_idx = core_ao_idx + alph_ao_idx
+        beta_occ_idx = core_ao_idx + beta_ao_idx
+        assert len(alph_occ_idx) == nelec_alph
+        assert len(beta_occ_idx) == nelec_beta
+
+        alph_vir_idx = list(set(range(nao)) - set(alph_occ_idx))
+        beta_vir_idx = list(set(range(nao)) - set(beta_occ_idx))
+
+        alph_idx = alph_occ_idx + alph_vir_idx
+        beta_idx = beta_occ_idx + beta_vir_idx
+
+        coeff_bs_alph = numpy.array(coeff_ao_lo[:, alph_idx])
+        coeff_bs_beta = numpy.array(coeff_ao_lo[:, beta_idx])
+        coeff_bs = (coeff_bs_alph, coeff_bs_beta)
+
+        dm_bs_alph = numpy.dot(coeff_bs_alph, coeff_bs_alph.conj().T)
+        dm_bs_beta = numpy.dot(coeff_bs_beta, coeff_bs_beta.conj().T)
+        dm_bs = (dm_bs_alph, dm_bs_beta)
+
+        ene_bs_uhf, vfci_bs_uhf      = get_uhf_vfci(coeff_rhf, coeff_bs, uhf_obj=uhf_obj)
         ene_bs_ump2, vfci_bs_ump2    = get_ump2_vfci(coeff_rhf, coeff_bs_uhf, uhf_obj=uhf_obj)
         # ene_bs_ucisd, vfci_bs_ucisd  = get_ucisd_vfci(coeff_rhf, coeff_bs_uhf, uhf_obj=uhf_obj)
 
@@ -241,6 +268,37 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
             print("ene_bs_uhf_ref = %12.8f" % ene_bs_uhf_ref)
             print("ene_bs_uhf     = %12.8f" % ene_bs_uhf)
             print("err = %12.8e" % abs(ene_bs_uhf - ene_bs_uhf_ref))
+
+        coeff_alph_occ = coeff_bs_uhf[0][:, :nelec_alph_bs+nelec_alph_core]
+        coeff_beta_occ = coeff_bs_uhf[1][:, :nelec_beta_bs+nelec_beta_core]
+        ovlp_alph_beta_mo = reduce(numpy.dot, (coeff_alph_occ.conj().T, ovlp_ao, coeff_beta_occ))
+        ovlp_alph_beta    = numpy.linalg.det(ovlp_alph_beta_mo)
+        
+
+        print("\n")
+        print("idx = %d" % idx)
+        print("occupied alpha AOs = ")
+        for ao_idx in alph_ao_idx:
+            print(mol.ao_labels()[ao_idx])
+        print("occupied beta AOs = ")
+        for ao_idx in beta_ao_idx:
+            print(mol.ao_labels()[ao_idx])
+
+        print("ovlp_alph_beta = %12.8f" % ovlp_alph_beta)
+        print("Core overlap matrix =")
+        dump_rec(stdout, ovlp_alph_beta_mo[0:nelec_alph_core, 0:nelec_beta_core])
+
+        print("Active AO overlap matrix =")
+        label = [mol.ao_labels()[ao_idx] for ao_idx in bs_ao_idx]
+        dump_rec(stdout, ovlp_ao[bs_ao_idx, :][:, bs_ao_idx], label)
+
+        print("Active overlap matrix =")
+        dump_rec(stdout, ovlp_alph_beta_mo[nelec_alph_core:, nelec_beta_core:])
+        print("Active alpha MO coefficients:")
+        dump_rec(stdout, coeff_alph_occ[:, nelec_alph_core:], mol.ao_labels())
+
+        print("Active beta MO coefficients:")
+        dump_rec(stdout, coeff_beta_occ[:, nelec_beta_core:], mol.ao_labels())
 
         ene_bs_uhf_list.append(ene_bs_uhf)
         ene_bs_ump2_list.append(ene_bs_ump2)
@@ -261,6 +319,8 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False):
         data_dict["s2_bs_uhf_%s" % idx]    = s2_from_fcivec(vfci_bs_uhf)
         data_dict["s2_bs_ump2_%s" % idx]   = s2_from_fcivec(vfci_bs_ump2)
         # data_dict["s2_bs_ucisd_%s" % idx]  = s2_from_fcivec(vfci_bs_ucisd)
+
+    assert 1 == 2
 
     ene_noci_uhf, vfci_noci_uhf        = solve_uhf_noci(v_bs_uhf_list,  hv_bs_uhf_list, ene_bs_uhf_list, tol=1e-8)
     ene_noci_ump2_1, vfci_noci_ump2_1  = solve_ump2_noci(v_bs_ump2_list, hv_bs_ump2_list, v_bs_uhf_list=v_bs_uhf_list, ene_ump2_list=ene_bs_ump2_list, tol=1e-8, method=1, ref=ene_fci)

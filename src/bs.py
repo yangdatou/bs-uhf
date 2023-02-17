@@ -93,6 +93,9 @@ def ucisd_guess(ucisd_obj, eris=None):
 def get_coeff_uhf(uhf_obj=None, dm0=None, is_scf=False):
     fock_ao = uhf_obj.get_fock(dm=dm0)
     mo_energy, mo_coeff = uhf_obj.eig(fock_ao, uhf_obj.get_ovlp())
+    print("mo_energy", mo_energy[0])
+    print("mo_energy", mo_energy[1])
+    # print("mo_coeff", mo_coeff)
     uhf_obj.mo_energy = mo_energy
     uhf_obj.mo_coeff  = mo_coeff
     uhf_obj.mo_occ    = uhf_obj.get_occ(mo_energy=mo_energy, mo_coeff=mo_coeff)
