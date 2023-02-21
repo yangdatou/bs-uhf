@@ -69,13 +69,16 @@ def analyze_weight2(mos, mol_obj, w_ao, label_list, tol=1e-3):
 
     return mo_label
 
-def analyze_bs_mo(mos, mol_obj, w_ao, tol=1e-3):
+def analyze_bs_mo(mos, mol_obj, tol=1e-3):
     nao, nmo = mos.shape
+    
+    ovlp_ao = mol_obj.intor("int1e_ovlp")
+    w_ao    = sqrtm(ovlp_ao)
     assert w_ao.shape == (nao, nao)
 
-    w_mo  = numpy.einsum("mn,mp->np", w_ao, mos)
-    w2_mo = numpy.einsum("np,np->np", w_mo, w_mo)
-    assert w2_mo.shape == (nao, nmo)
+    w_ao_mo  = numpy.einsum("mn,mp->np", w_ao, mos)
+    w2_ao_mo = numpy.einsum("np,np->np", w_ao_mo, w_ao_mo)
+    assert w2_ao_mo.shape == (nao, nmo)
 
     for ia, tmp  in enumerate(mol_obj.aoslice_by_atom):
         print("Atom %d" % ia)
@@ -126,84 +129,10 @@ def solve_n2_rohf(x=1.0, spin=0, basis="ccpvdz"):
     mo_energy, mo_coeff = uhf_obj.eig(fock_ao_uhf, ovlp_ao)
     mo_occ = uhf_obj.get_occ(mo_energy, mo_coeff)
 
-    coeff_alph_occ = mo_coeff[0][:, mo_occ[0] > 0]
-    coeff_alph_vir = mo_coeff[0][:, mo_occ[0] == 0]
-    coeff_beta_occ = mo_coeff[1][:, mo_occ[1] > 0]
-    coeff_beta_vir = mo_coeff[1][:, mo_occ[1] == 0]
+    analyze_bs_mo(mo_coeff[0], mol)
+    analyze_bs_mo(mo_coeff[1], mol)
 
-    label_list = ["0 N", "1 N"]
-
-    w_ao = sqrtm(ovlp_ao)    
-    mo_label = analyze_weight(mo_coeff[0], mol, w_ao, label_list, tol=1e-3)
-    # ene_list = [mo_energy[0][lo_dict[x]] if lo_dict.get(x) else None for x in label_list]
     
-    n_2s_2pz_ene_list = []
-    n0_2px_ene_list   = []
-    n0_2py_ene_list   = []
-    n1_2px_ene_list   = []
-    n1_2py_ene_list   = []
-
-    for i, label, weight in mo_label:
-        if "N 2s" in label:
-            n_2s_2pz_ene_list.append(mo_energy[0][i])
-        elif "0 N 2px" in label:
-            n0_2px_ene_list.append(mo_energy[0][i])
-        elif "0 N 2py" in label:
-            n0_2py_ene_list.append(mo_energy[0][i])
-        elif "1 N 2px" in label:
-            n1_2px_ene_list.append(mo_energy[0][i])
-        elif "1 N 2py" in label:
-            n1_2py_ene_list.append(mo_energy[0][i])
-
-    assert len(n0_2px_ene_list) == 1
-    assert len(n0_2py_ene_list) == 1
-    assert len(n1_2px_ene_list) == 1
-    assert len(n1_2py_ene_list) == 1
-
-    # if len(n_2s_2pz_ene_list) == 2:
-    #     print(f"{x:12.8}, {n_2s_2pz_ene_list[0]:12.8f}, {n_2s_2pz_ene_list[1]:12.8f}, {n0_2px_ene_list[0]:12.8f}, {n0_2py_ene_list[0]:12.8f}, {n1_2px_ene_list[0]:12.8f}, {n1_2py_ene_list[0]:12.8f}")
-    # elif len(n_2s_2pz_ene_list) == 1:
-    #     print(f"{x:12.8}, {n_2s_2pz_ene_list[0]:12.8f}, {n_2s_2pz_ene_list[0]:12.8f}, {n0_2px_ene_list[0]:12.8f}, {n0_2py_ene_list[0]:12.8f}, {n1_2px_ene_list[0]:12.8f}, {n1_2py_ene_list[0]:12.8f}")
-
-
-    # if len(n2s_ene_list) == 2:
-    #     print(f"{x:12.8}, {n2s_ene_list[0]:12.8f}, {n2s_ene_list[1]:12.6f}, {n0_2p_ene_list[0]:12.8f}, {n1_2p_ene_list[0]:12.8f}")
-    # else:
-    #     print(len(n0_2pz_ene_list))
-    #     print(len(n1_2pz_ene_list))
-    #     print(f"{x:12.8}, {n2s_ene_list[0]:12.8f}, {'None':12s}, {n0_2p_ene_list[0]:12.8f}, {n1_2p_ene_list[0]:12.8f}")
-    # # print(n2s_ene_list)
-    
-
-    # assert 1 == 2
-    print("\nMO label, weight, energy")
-    for i, label, weight in mo_label:
-        print(f"MO {i:5d}: {label:8s} {weight:8.4f} {mo_energy[0][i]:8.4f}")
-
-    # label_str = ", ".join(["%8s" % x for x in label_list])
-    # print("\nLO weight", label_str)
-    # print("MO energy", ", ".join(["%8.4f" % x if x else "%8s"%"None" for x in ene_list]))
-
-    # print("\ncoeff_alph_vir")
-    # analyze_weight(coeff_alph_vir, mol, w_ao, label_list, tol=1e-3)
-
-    # print("\ncoeff_beta_occ")
-    # analyze_weight(coeff_beta_occ, mol, w_ao, label_list, tol=1e-3)
-
-    # print("\ncoeff_beta_vir")
-    # analyze_weight(coeff_beta_vir, mol, w_ao, label_list, tol=1e-3)
-
-    # coeff_alph_occ_lo = localize_mo(coeff_alph_occ, mol_obj=mol, ovlp_ao=ovlp_ao, method="boys")
-    # coeff_alph_vir_lo = localize_mo(coeff_alph_vir, mol_obj=mol, ovlp_ao=ovlp_ao, method="boys")
-    # coeff_beta_occ_lo = localize_mo(coeff_beta_occ, mol_obj=mol, ovlp_ao=ovlp_ao, method="boys")
-    # coeff_beta_vir_lo = localize_mo(coeff_beta_vir, mol_obj=mol, ovlp_ao=ovlp_ao, method="boys")
-
-    # foo = numpy.einsum("mp,nq,mn->pq", coeff_alph_occ_lo, coeff_alph_occ_lo, fock_ao_uhf[0])
-    # fvv = numpy.einsum("mp,nq,mn->pq", coeff_alph_vir_lo, coeff_alph_vir_lo, fock_ao_uhf[0])
-    # print("foo = \n", foo)
-    # print("fvv = \n", fvv)
-    
-    # assert 1 == 2
 
 
 if __name__ == "__main__":
