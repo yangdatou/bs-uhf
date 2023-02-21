@@ -255,50 +255,13 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False, tmp_dir=None):
         coeff_bs_beta = numpy.array(coeff_ao_lo[:, beta_idx])
         coeff_bs = (coeff_bs_alph, coeff_bs_beta)
 
-        dm_bs_alph = numpy.dot(coeff_bs_alph, coeff_bs_alph.conj().T)
-        dm_bs_beta = numpy.dot(coeff_bs_beta, coeff_bs_beta.conj().T)
-        dm_bs = (dm_bs_alph, dm_bs_beta)
+        mo_occ_alph = [0] * nelec_alph + [1] * (norb - nelec_alph)
+        mo_occ_beta = [0] * nelec_beta + [1] * (norb - nelec_beta)
+        mo_occ_uhf  = numpy.asarray((mo_occ_alph, mo_occ_beta))
 
-        ene_bs_uhf, vfci_bs_uhf      = get_uhf_vfci(coeff_rhf, coeff_bs, uhf_obj=uhf_obj)
-        ene_bs_ump2, vfci_bs_ump2    = get_ump2_vfci(coeff_rhf, coeff_bs_uhf, uhf_obj=uhf_obj)
+        ene_bs_uhf, vfci_bs_uhf      = get_uhf_vfci(coeff_ao_lo,  coeff_bs, mo_occ_uhf=mo_occ_uhf, ovlp_ao=ovlp_ao, uhf_obj=uhf_obj)
+        ene_bs_ump2, vfci_bs_ump2    = get_ump2_vfci(coeff_ao_lo, coeff_bs, mo_occ_uhf=mo_occ_uhf, ovlp_ao=ovlp_ao, uhf_obj=uhf_obj)
         # ene_bs_ucisd, vfci_bs_ucisd  = get_ucisd_vfci(coeff_rhf, coeff_bs_uhf, uhf_obj=uhf_obj)
-
-        if not abs(ene_bs_uhf - ene_bs_uhf_ref) < 1e-8:
-            print("Warning: ene_bs_uhf != ene_bs_uhf_ref")
-            print("ene_bs_uhf_ref = %12.8f" % ene_bs_uhf_ref)
-            print("ene_bs_uhf     = %12.8f" % ene_bs_uhf)
-            print("err = %12.8e" % abs(ene_bs_uhf - ene_bs_uhf_ref))
-
-        coeff_alph_occ = coeff_bs_uhf[0][:, :nelec_alph_bs+nelec_alph_core]
-        coeff_beta_occ = coeff_bs_uhf[1][:, :nelec_beta_bs+nelec_beta_core]
-        ovlp_alph_beta_mo = reduce(numpy.dot, (coeff_alph_occ.conj().T, ovlp_ao, coeff_beta_occ))
-        ovlp_alph_beta    = numpy.linalg.det(ovlp_alph_beta_mo)
-        
-
-        print("\n")
-        print("idx = %d" % idx)
-        print("occupied alpha AOs = ")
-        for ao_idx in alph_ao_idx:
-            print(mol.ao_labels()[ao_idx])
-        print("occupied beta AOs = ")
-        for ao_idx in beta_ao_idx:
-            print(mol.ao_labels()[ao_idx])
-
-        print("ovlp_alph_beta = %12.8f" % ovlp_alph_beta)
-        print("Core overlap matrix =")
-        dump_rec(stdout, ovlp_alph_beta_mo[0:nelec_alph_core, 0:nelec_beta_core])
-
-        print("Active AO overlap matrix =")
-        label = [mol.ao_labels()[ao_idx] for ao_idx in bs_ao_idx]
-        dump_rec(stdout, ovlp_ao[bs_ao_idx, :][:, bs_ao_idx], label)
-
-        print("Active overlap matrix =")
-        dump_rec(stdout, ovlp_alph_beta_mo[nelec_alph_core:, nelec_beta_core:])
-        print("Active alpha MO coefficients:")
-        dump_rec(stdout, coeff_alph_occ[:, nelec_alph_core:], mol.ao_labels())
-
-        print("Active beta MO coefficients:")
-        dump_rec(stdout, coeff_beta_occ[:, nelec_beta_core:], mol.ao_labels())
 
         ene_bs_uhf_list.append(ene_bs_uhf)
         ene_bs_ump2_list.append(ene_bs_ump2)
@@ -319,8 +282,6 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False, tmp_dir=None):
         data_dict["s2_bs_uhf_%s" % idx]    = s2_from_fcivec(vfci_bs_uhf)
         data_dict["s2_bs_ump2_%s" % idx]   = s2_from_fcivec(vfci_bs_ump2)
         # data_dict["s2_bs_ucisd_%s" % idx]  = s2_from_fcivec(vfci_bs_ucisd)
-
-    assert 1 == 2
 
     ene_noci_uhf, vfci_noci_uhf        = solve_uhf_noci(v_bs_uhf_list,  hv_bs_uhf_list, ene_bs_uhf_list, tol=1e-8)
     ene_noci_ump2_1, vfci_noci_ump2_1  = solve_ump2_noci(v_bs_ump2_list, hv_bs_ump2_list, v_bs_uhf_list=v_bs_uhf_list, ene_ump2_list=ene_bs_ump2_list, tol=1e-8, method=1, ref=ene_fci)

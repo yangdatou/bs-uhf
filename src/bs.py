@@ -93,9 +93,7 @@ def ucisd_guess(ucisd_obj, eris=None):
 def get_coeff_uhf(uhf_obj=None, dm0=None, is_scf=False):
     fock_ao = uhf_obj.get_fock(dm=dm0)
     mo_energy, mo_coeff = uhf_obj.eig(fock_ao, uhf_obj.get_ovlp())
-    print("mo_energy", mo_energy[0])
-    print("mo_energy", mo_energy[1])
-    # print("mo_coeff", mo_coeff)
+
     uhf_obj.mo_energy = mo_energy
     uhf_obj.mo_coeff  = mo_coeff
     uhf_obj.mo_occ    = uhf_obj.get_occ(mo_energy=mo_energy, mo_coeff=mo_coeff)
@@ -113,24 +111,31 @@ def get_coeff_uhf(uhf_obj=None, dm0=None, is_scf=False):
     ene_uhf = uhf_obj.energy_elec(dm_uhf, h1e=None, vhf=None)[0]
     return ene_uhf, uhf_obj.mo_coeff
 
-def get_uhf_vfci(coeff_rhf=None, coeff_uhf=None, uhf_obj=None):
-    nelec   = uhf_obj.nelec
-    ovlp_ao = uhf_obj.get_ovlp()
+def get_uhf_vfci(coeff_rhf=None, coeff_uhf=None, mo_occ_uhf=None, ovlp_ao=None, uhf_obj=None):
+    nao, norb   = coeff_rhf.shape
+    nelec       = uhf_obj.nelec
+    nelec_alph  = nelec[0]
+    nelec_beta  = nelec[1]
+
+    uhf_obj.reset()
+    uhf_obj.mo_occ   = mo_occ_uhf
+    uhf_obj.mo_coeff = coeff_uhf
+    dm_uhf  = uhf_obj.make_rdm1(coeff_uhf, mo_occ_uhf)
+    ene_uhf = uhf_obj.energy_elec(dm_uhf, h1e=None, vhf=None)[0]
     
     vfci = proj_uhf_to_fci_vec(coeff_rhf, coeff_uhf, nelec, ovlp_ao)
-    assert uhf_obj.mo_occ is not None
-    assert uhf_obj.mo_energy is not None
-    dm_uhf = uhf_obj.make_rdm1(coeff_uhf, uhf_obj.mo_occ)
-    ene_uhf = uhf_obj.energy_elec(dm_uhf, h1e=None, vhf=None)[0]
     return ene_uhf, vfci
 
-def get_ump2_vfci(coeff_rhf=None, coeff_uhf=None, uhf_obj=None):
-    nelec   = uhf_obj.nelec
-    ovlp_ao = uhf_obj.get_ovlp()
-
-    assert uhf_obj.mo_occ is not None
-    assert uhf_obj.mo_energy is not None
-    dm_uhf = uhf_obj.make_rdm1(coeff_uhf, uhf_obj.mo_occ)
+def get_ump2_vfci(coeff_rhf=None, coeff_uhf=None, mo_occ_uhf=None, ovlp_ao=None, uhf_obj=None):
+    nao, norb   = coeff_rhf.shape
+    nelec       = uhf_obj.nelec
+    nelec_alph  = nelec[0]
+    nelec_beta  = nelec[1]
+    
+    uhf_obj.reset()
+    uhf_obj.mo_occ   = mo_occ_uhf
+    uhf_obj.mo_coeff = coeff_uhf
+    dm_uhf  = uhf_obj.make_rdm1(coeff_uhf, mo_occ_uhf)
     ene_uhf = uhf_obj.energy_elec(dm_uhf, h1e=None, vhf=None)[0]
 
     ucisd_obj = ci.UCISD(uhf_obj)
@@ -189,17 +194,7 @@ def solve_uhf_noci(v_bs_uhf_list, hv_bs_uhf_list, ene_bs_uhf_list, tol=1e-8):
 def truncate_generalized_eigen_problem(h, s, tol=1e-8):
     u, e, vh = scipy.linalg.svd(s)
     mask = numpy.abs(e) > tol
-
     n0 = s.shape[0]
-    tmp = "\nSingular values = \n"
-    for i in range(n0):
-        if i > 0 and i % 5 == 0:
-            tmp = tmp[:-2] + "\n"
-        tmp += "% 8.4e, " % e[i]
-
-    if tmp[-2] == ",":
-        tmp = tmp[:-2]
-    print(tmp + "\n")
 
     u   = u[:,mask]
     e   = e[mask]
@@ -207,7 +202,7 @@ def truncate_generalized_eigen_problem(h, s, tol=1e-8):
     
     n1 = vh.shape[0]
     trunc_err = numpy.linalg.norm(s - reduce(numpy.dot, (u, numpy.diag(e), vh)))
-
+    
     if not trunc_err < tol:
         print("Warning: truncation error is large")
         print("tol = %8.4e, trunc_err = %8.4e: %d -> %d" % (tol, trunc_err, n0, n1))
