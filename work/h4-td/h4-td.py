@@ -264,6 +264,6 @@ if __name__ == "__main__":
     print("tmp_dir  = %s" % tmp_dir)
     print("h5_path  = %s" % h5_path)
 
-    for x in numpy.linspace(0.4, 1.0, 41):
+    for x in numpy.linspace(0.4, 1.5, 41):
         data_dict = solve_h4_bs_noci(x, basis=basis)
         chkfile.save(h5_path, "%.8f" % x, data_dict)
