@@ -19,6 +19,8 @@ from bs import solve_uhf_noci
 from bs import solve_ump2_noci
 from bs import solve_ucisd_noci
 
+dm_rhf_pre = None
+
 def make_h4(x, basis="sto-3g"):
     '''Make a tetrahedral H4 molecule
     '''
@@ -55,7 +57,6 @@ def make_dm0(h4):
     return dm0_list
 
 def solve_h4_bs_noci(x, basis="sto3g"):
-
     res = make_h4(x, basis)
     h4  = res[0]
     h4.verbose = 0
@@ -78,11 +79,15 @@ def solve_h4_bs_noci(x, basis="sto3g"):
     get_s2 = lambda v: spin_square(v, norb, (nelec_alph, nelec_beta), mo_coeff=coeff_ao_lo, ovlp=ovlp_ao)[0]
     get_hv = lambda v: contract_2e(ham, v, norb, (nelec_alph, nelec_beta))
 
-    method_list = ["uhf", "ump2"] #, "ucisd"]
+    method_list = ["uhf", "ump2", "ucisd"]
     func_dict   = {
-        "uhf"  : get_uhf_vfci,
-        "ump2" : get_ump2_vfci,
-        "ucisd": get_ucisd_vfci,
+        "vfci-uhf"  : get_uhf_vfci,
+        "vfci-ump2" : get_ump2_vfci,
+        "vfci-ucisd": get_ucisd_vfci,
+    
+        "noci-uhf"  : None,
+        "noci-ump2" : solve_ump2_noci,
+        "noci-ucisd": solve_ucisd_noci,
     }
 
     data_dict   = {
@@ -99,17 +104,21 @@ def solve_h4_bs_noci(x, basis="sto3g"):
         data_dict[f"v-{m}-bs"]    = []
         data_dict[f"hv-{m}-bs"]   = []
 
-    dm0_list = make_dm0(h4)
+    dm0_list   = make_dm0(h4)
+    dm_bs_list = []
     nbs = len(dm0_list)
 
-    for ibs, dm_bs in enumerate(dm0_list):
-        uhf_obj.kernel(dm0=dm_bs)
+    for ibs, dm0 in enumerate(dm0_list):
+        uhf_obj.kernel(dm0=dm0)
+        dm_uhf = uhf_obj.make_rdm1()
+        dm_bs_list.append(dm_uhf)
+
         coeff_uhf  = uhf_obj.mo_coeff
         mo_occ_uhf = uhf_obj.mo_occ
         args = (coeff_ao_lo, coeff_uhf, mo_occ_uhf, ovlp_ao, uhf_obj)
 
         for m in method_list:
-            ene_bs, v_bs = func_dict[m](*args)
+            ene_bs, v_bs = func_dict[f"vfci-{m}"](*args)
             hv_bs = get_hv(v_bs)
             s2_bs = get_s2(v_bs)
 
@@ -117,15 +126,36 @@ def solve_h4_bs_noci(x, basis="sto3g"):
             data_dict[f"s2-{m}-bs"].append(s2_bs)
             data_dict[f"v-{m}-bs"].append(v_bs)
             data_dict[f"hv-{m}-bs"].append(hv_bs)
-
+    
     rhf_obj = scf.RHF(h4)
-    rhf_obj.verbose = 4
-    rhf_obj.conv_tol = 1e-8
-    rhf_obj.max_cycle = 1000
-    rhf_obj.kernel(dm0_list[0][0] + dm0_list[0][1])
-    coeff_rhf = rhf_obj.mo_coeff
-    ene_rhf   = rhf_obj.energy_elec()[0]
+    ene_rhf_list = []
+    dm_rhf_list  = []
+
+    global dm_rhf_pre
+
+    dm0_list = [dm_rhf_pre] + [dm[0] + dm[1] for dm in dm_bs_list]
+    for ibs, dm_uhf in enumerate(dm0_list):
+        rhf_obj.verbose   = 0
+        rhf_obj.conv_tol  = 1e-10
+        rhf_obj.max_cycle = 500
+
+        if dm_uhf is not None:
+            rhf_obj.kernel(dm0=dm_uhf)
+        else:
+            rhf_obj.kernel()
+
+        ene_rhf_list.append(rhf_obj.energy_elec()[0])
+        dm_rhf_list.append(rhf_obj.make_rdm1())
+    
+    rhf_min_idx = numpy.argmin(ene_rhf_list)
+    rhf_obj.verbose   = 4
+    rhf_obj.conv_tol  = 1e-12
+    rhf_obj.max_cycle = 2000
+    rhf_obj.kernel(dm_rhf_list[rhf_min_idx])
+    ene_rhf = rhf_obj.energy_elec()[0]
     assert rhf_obj.converged
+
+    dm_rhf_pre = rhf_obj.make_rdm1()
 
     rmp2_obj = mp.RMP2(rhf_obj)
     rmp2_obj.kernel()
@@ -136,16 +166,16 @@ def solve_h4_bs_noci(x, basis="sto3g"):
     ene_rcisd = rcisd_obj.e_corr + ene_rhf
     assert rcisd_obj.converged
 
-    data_dict["ene-rhf"]  = ene_rhf
-    data_dict["ene-rmp2"] = ene_rmp2
+    data_dict["ene-rhf"]   = ene_rhf
+    data_dict["ene-rmp2"]  = ene_rmp2
     data_dict["ene-rcisd"] = ene_rcisd
 
     v_bs_uhf   = numpy.array(data_dict["v-uhf-bs"])
     hv_bs_uhf  = numpy.array(data_dict["hv-uhf-bs"])
     ene_bs_uhf = numpy.array(data_dict["ene-uhf-bs"])
     s2_bs_uhf  = numpy.array(data_dict["s2-uhf-bs"])
-    data_dict["v-uhf-bs"]   = v_bs_uhf
-    data_dict["hv-uhf-bs"]  = hv_bs_uhf
+    data_dict["v-uhf-bs"]   = 0 # v_bs_uhf
+    data_dict["hv-uhf-bs"]  = 0 # hv_bs_uhf
     data_dict["ene-uhf-bs"] = ene_bs_uhf
     data_dict["s2-uhf-bs"]  = s2_bs_uhf
     args       = (v_bs_uhf,  hv_bs_uhf, ene_bs_uhf)
@@ -155,35 +185,39 @@ def solve_h4_bs_noci(x, basis="sto3g"):
     assert ene_bs_uhf.shape == (nbs,)
 
     ene_noci_uhf, v_noci_uhf  = solve_uhf_noci(*args, tol=1e-8)
+    data_dict["v-noci-uhf"]   = 0 # v_noci_uhf
     data_dict["ene-noci-uhf"] = ene_noci_uhf
-    data_dict["v-noci-uhf"]   = v_noci_uhf
     data_dict["s2-noci-uhf"]  = get_s2(v_noci_uhf)
 
-    v_bs_ump2   = numpy.array(data_dict["v-ump2-bs"])
-    hv_bs_ump2  = numpy.array(data_dict["hv-ump2-bs"])
-    ene_bs_ump2 = numpy.array(data_dict["ene-ump2-bs"])
-    s2_bs_ump2  = numpy.array(data_dict["s2-ump2-bs"])
-    data_dict["v-ump2-bs"]    = v_bs_ump2
-    data_dict["hv-ump2-bs"]   = hv_bs_ump2
-    data_dict["ene-ump2-bs"]  = ene_bs_ump2
-    data_dict["s2-ump2-bs"]   = s2_bs_ump2
-    args = (v_bs_ump2, hv_bs_ump2, v_bs_uhf, ene_bs_ump2)
+    for m in method_list:
+        if m == "uhf":
+            continue
 
-    assert v_bs_ump2.shape   == (nbs, ndeta, ndetb)
-    assert hv_bs_ump2.shape  == (nbs, ndeta, ndetb)
-    assert ene_bs_ump2.shape == (nbs,)
+        v_bs   = numpy.array(data_dict[f"v-{m}-bs"])
+        hv_bs  = numpy.array(data_dict[f"hv-{m}-bs"])
+        ene_bs = numpy.array(data_dict[f"ene-{m}-bs"])
+        s2_bs  = numpy.array(data_dict[f"s2-{m}-bs"])
+        data_dict[f"v-{m}-bs"]    = 0 # v_bs
+        data_dict[f"hv-{m}-bs"]   = 0 # hv_bs
+        data_dict[f"ene-{m}-bs"]  = ene_bs
+        data_dict[f"s2-{m}-bs"]   = s2_bs
+        args = (v_bs, hv_bs, v_bs_uhf, ene_bs)
 
-    ene_noci_ump2_1, v_noci_ump2_1 = solve_ump2_noci(*args, tol=1e-6, method=1, ref=None)
-    data_dict["ene-noci-ump2-1"]   = ene_noci_ump2_1
-    data_dict["v-noci-ump2-1"]     = v_noci_ump2_1
-    data_dict["s2-noci-ump2-1"]    = get_s2(v_noci_ump2_1)
+        assert v_bs.shape   == (nbs, ndeta, ndetb)
+        assert hv_bs.shape  == (nbs, ndeta, ndetb)
+        assert ene_bs.shape == (nbs,)
 
-    ene_noci_ump2_2, v_noci_ump2_2 = solve_ump2_noci(*args, tol=1e-6, method=2, ref=None)
-    data_dict["ene-noci-ump2-2"]   = ene_noci_ump2_2
-    data_dict["v-noci-ump2-2"]     = v_noci_ump2_2
-    data_dict["s2-noci-ump2-2"]    = get_s2(v_noci_ump2_2)
+        ene_noci_1, v_noci_1 = func_dict[f"noci-{m}"](*args, tol=1e-4, method=1, ref=None)
+        data_dict[f"v-noci-{m}-1"]     = 0 # v_noci_1
+        data_dict[f"ene-noci-{m}-1"]   = ene_noci_1
+        data_dict[f"s2-noci-{m}-1"]    = get_s2(v_noci_1)
 
-    print(f"x = {x: 6.4f}, ene-fci = {ene_fci: 16.12f}, {ene_noci_uhf: 16.12f}, {ene_noci_ump2_1: 16.12f}, {ene_noci_ump2_2: 16.12f}")
+        ene_noci_2, v_noci_2 = func_dict[f"noci-{m}"](*args, tol=1e-4, method=2, ref=None)
+        data_dict[f"v-noci-{m}-2"]     = 0 # v_noci_2
+        data_dict[f"ene-noci-{m}-2"]   = ene_noci_2
+        data_dict[f"s2-noci-{m}-2"]    = get_s2(v_noci_2)
+
+    print(f"x = {x: 6.4f}, {ene_fci: 16.12f}")
 
     return data_dict
 
@@ -208,7 +242,7 @@ if __name__ == "__main__":
     print("tmp_dir  = %s" % tmp_dir)
     print("h5_path  = %s" % h5_path)
 
-    for x in numpy.linspace(0.4, 1.0, 41):
+    for x in numpy.linspace(0.5, 1.5, 41):
         data_dict = solve_h4_bs_noci(x, basis=basis)
         chkfile.save(h5_path, "%.8f" % x, data_dict)
 

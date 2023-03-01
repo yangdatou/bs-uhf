@@ -141,7 +141,7 @@ def get_ump2_vfci(coeff_rhf=None, coeff_uhf=None, mo_occ_uhf=None, ovlp_ao=None,
     vfci = proj_ucisd_to_fci_vec(coeff_rhf, coeff_uhf, vec_ucisd_ump2, nelec, ovlp_ao)
     return ene_ump2_corr + ene_uhf, vfci
 
-def get_ucisd_vfci(coeff_rhf=None, coeff_uhf=None, uhf_obj=None):
+def get_ucisd_vfci(coeff_rhf=None, coeff_uhf=None, mo_occ_uhf=None, ovlp_ao=None, uhf_obj=None):
     nelec   = uhf_obj.nelec
     ovlp_ao = uhf_obj.get_ovlp()
 
@@ -151,6 +151,7 @@ def get_ucisd_vfci(coeff_rhf=None, coeff_uhf=None, uhf_obj=None):
     ene_uhf = uhf_obj.energy_elec(dm_uhf, h1e=None, vhf=None)[0]
 
     ucisd_obj = ci.UCISD(uhf_obj)
+    ucisd_obj.verbose = 4
     ucisd_obj.max_cycle = 50000
     ucisd_obj.max_space = 1000
     ene_ump2_corr, vec_ucisd_ump2 = ucisd_obj.get_init_guess()
