@@ -134,13 +134,13 @@ def solve_h4_bs_noci(x, basis="sto3g"):
     global dm_rhf_pre
 
     dm0_list = [dm_rhf_pre] + [dm[0] + dm[1] for dm in dm_bs_list]
-    for ibs, dm_uhf in enumerate(dm0_list):
+    for ibs, dm0 in enumerate(dm0_list):
         rhf_obj.verbose   = 0
         rhf_obj.conv_tol  = 1e-10
         rhf_obj.max_cycle = 500
 
-        if dm_uhf is not None:
-            rhf_obj.kernel(dm0=dm_uhf)
+        if dm0 is not None and dm0.shape == ovlp_ao.shape:
+            rhf_obj.kernel(dm0=dm0)
         else:
             rhf_obj.kernel()
 
