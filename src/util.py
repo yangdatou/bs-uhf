@@ -76,6 +76,21 @@ def solve_rhf(mol, dm0=None):
     assert rhf_obj.converged
     return rhf_obj
 
+def localize_mo(mo, mol_obj=None, ovlp_ao=None, method="iao"):
+    if method == "iao":
+        c = lo.iao.iao(mol_obj, mo)
+        c = lo.vec_lowdin(c, ovlp_ao)
+        mo = c
+
+    elif method == "boys":
+        c = lo.Boys(mol_obj, mo).kernel()
+        mo = c
+
+    else:
+        raise NotImplementedError
+    
+    return mo
+
 def solve_uhf(mol, dm0=None):
     uhf_obj = scf.UHF(mol)
     uhf_obj.verbose   = 0
@@ -130,9 +145,11 @@ def get_bs_uhf_ao_label(mol=None, m=None):
         alph_ao_idx.append(mol.search_ao_label("0 N 2px")[0])
         alph_ao_idx.append(mol.search_ao_label("0 N 2py")[0])
         alph_ao_idx.append(mol.search_ao_label("0 N 2pz")[0])
+        # alph_ao_idx.append(mol.search_ao_label("0 N 2s")[0])
         beta_ao_idx.append(mol.search_ao_label("1 N 2px")[0])
         beta_ao_idx.append(mol.search_ao_label("1 N 2py")[0])
         beta_ao_idx.append(mol.search_ao_label("1 N 2pz")[0])
+        # beta_ao_idx.append(mol.search_ao_label("1 N 2s")[0])
 
     elif m == "hub":
         raise NotImplementedError
@@ -168,10 +185,12 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False, tmp_dir=None):
     ene_uhf   = uhf_obj.energy_elec()[0]
     assert uhf_obj.converged
 
+    coeff_ao_lo = coeff_uhf[0]
+
     nelec_alph_core = len(core_ao_idx)
     nelec_beta_core = len(core_ao_idx)
-    nelec_alph_bs   = len(bs_ao_idx) // 2
-    nelec_beta_bs   = len(bs_ao_idx) - nelec_alph_bs
+    nelec_alph_bs   = 3 # len(bs_ao_idx) // 2
+    nelec_beta_bs   = 3 # len(bs_ao_idx) - nelec_alph_bs
     nelec_bs        = nelec_alph_bs + nelec_beta_bs
     assert nelec_alph_core + nelec_alph_bs == nelec_alph
     assert nelec_beta_core + nelec_beta_bs == nelec_beta
@@ -236,12 +255,11 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False, tmp_dir=None):
     hv_bs_ucisd_list   = []
 
     alph_ao_idx_comb = combinations(bs_ao_idx, nelec_alph_bs)
-    for idx, alph_ao_idx in enumerate(alph_ao_idx_comb):
-        alph_ao_idx = list(alph_ao_idx)
-        beta_ao_idx = list(set(bs_ao_idx) - set(alph_ao_idx))
 
-        alph_occ_idx = core_ao_idx + alph_ao_idx
-        beta_occ_idx = core_ao_idx + beta_ao_idx
+    for idxa, alph_ao_idx in enumerate(alph_ao_idx_comb):
+        beta_ao_idx = list(set(bs_ao_idx) - set(alph_ao_idx))
+        alph_occ_idx = list(core_ao_idx) + list(alph_ao_idx)
+        beta_occ_idx = list(core_ao_idx) + list(beta_ao_idx)
         assert len(alph_occ_idx) == nelec_alph
         assert len(beta_occ_idx) == nelec_beta
 
@@ -275,17 +293,19 @@ def solve_bs_noci(r, basis="sto-3g", m="h2", is_scf=False, tmp_dir=None):
         hv_bs_ump2_list.append(contract_2e(ham, vfci_bs_ump2, norb, (nelec_alph, nelec_beta)))
         # hv_bs_ucisd_list.append(contract_2e(ham, vfci_bs_ucisd, norb, (nelec_alph, nelec_beta)))
 
-        data_dict["ene_bs_uhf_%s" % idx]   = ene_bs_uhf
-        data_dict["ene_bs_ump2_%s" % idx]  = ene_bs_ump2
+        idxb = idxa
+        data_dict["ene_bs_uhf_%s_%s" % (idxa, idxb)]  = ene_bs_uhf
+        data_dict["ene_bs_ump2_%s_%s" % (idxa, idxb)] = ene_bs_ump2
         # data_dict["ene_bs_ucisd_%s" % idx] = ene_bs_ucisd
 
-        data_dict["s2_bs_uhf_%s" % idx]    = s2_from_fcivec(vfci_bs_uhf)
-        data_dict["s2_bs_ump2_%s" % idx]   = s2_from_fcivec(vfci_bs_ump2)
+        data_dict["s2_bs_uhf_%s_%s" % (idxa, idxb)]   = s2_from_fcivec(vfci_bs_uhf)
+        data_dict["s2_bs_ump2_%s_%s" % (idxa, idxb)]  = s2_from_fcivec(vfci_bs_ump2)
         # data_dict["s2_bs_ucisd_%s" % idx]  = s2_from_fcivec(vfci_bs_ucisd)
 
     ene_noci_uhf, vfci_noci_uhf        = solve_uhf_noci(v_bs_uhf_list,  hv_bs_uhf_list, ene_bs_uhf_list, tol=1e-8)
-    ene_noci_ump2_1, vfci_noci_ump2_1  = solve_ump2_noci(v_bs_ump2_list, hv_bs_ump2_list, v_bs_uhf_list=v_bs_uhf_list, ene_ump2_list=ene_bs_ump2_list, tol=1e-8, method=1, ref=ene_fci)
-    ene_noci_ump2_2, vfci_noci_ump2_2  = solve_ump2_noci(v_bs_ump2_list, hv_bs_ump2_list, v_bs_uhf_list=v_bs_uhf_list, ene_ump2_list=ene_bs_ump2_list, tol=1e-2, method=2, ref=ene_fci)
+    # ene_noci_ump2_1, vfci_noci_ump2_1  = solve_ump2_noci(v_bs_ump2_list, hv_bs_ump2_list, v_bs_uhf_list=v_bs_uhf_list, ene_ump2_list=ene_bs_ump2_list, tol=1e-8, method=1, ref=ene_fci)
+    # ene_noci_ump2_2, vfci_noci_ump2_2  = solve_ump2_noci(v_bs_ump2_list, hv_bs_ump2_list, v_bs_uhf_list=v_bs_uhf_list, ene_ump2_list=ene_bs_ump2_list, tol=1e-2, method=2, ref=ene_fci)
+    assert 1 == 2
     # ene_noci_ucisd_1 = solve_ucisd_noci(v_bs_ucisd_list, hv_bs_ucisd_list, v_bs_uhf_list=v_bs_uhf_list, ene_ucisd_list=ene_bs_ucisd_list, tol=1e-8, method=1, ref=ene_fci)
     # print("Solve UCISD NOCI with method 2")
     # ene_noci_ucisd_2 = solve_ucisd_noci(v_bs_ucisd_list, hv_bs_ucisd_list, v_bs_uhf_list=v_bs_uhf_list, ene_ucisd_list=ene_bs_ucisd_list, tol=1e-6, method=2, ref=ene_fci)

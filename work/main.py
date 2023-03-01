@@ -68,4 +68,4 @@ if __name__ == "__main__":
     h5_path  = os.path.join(dir_path, f"{m}-{basis}.h5")
     
     x_list   = numpy.linspace(0.8, 3.0, 41)
-    main(m, basis, h5_path, tmp_dir, x_list, is_scf=False)
+    main(m, basis, h5_path, tmp_dir, [4.0], is_scf=False)

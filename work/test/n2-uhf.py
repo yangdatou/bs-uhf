@@ -1,4 +1,5 @@
 from functools import reduce
+from itertools import combinations
 
 import os, sys
 from sys import stdout
@@ -6,68 +7,85 @@ import numpy, scipy
 from scipy.linalg import sqrtm
 
 import pyscf
-from pyscf import gto, scf, lo
-from pyscf.tools.dump_mat import dump_rec
+from pyscf import gto, scf, lo, fci
+from pyscf import ao2mo, mp, mcscf
+from pyscf.tools.dump_mat   import dump_rec
+from pyscf.ci.ucisd import amplitudes_to_cisdvec
+from pyscf.fci.direct_spin1 import absorb_h1e
+from pyscf.fci.direct_spin1 import contract_2e
 
 def localize_mo(mo, mol_obj=None, ovlp_ao=None, method="iao"):
     if method == "iao":
         c = lo.iao.iao(mol_obj, mo)
         c = lo.vec_lowdin(c, ovlp_ao)
-        mo = reduce(numpy.dot, (c.T, ovlp_ao, mo))
-        print(mo.shape)
-        print(c.shape)
+        mo = c
 
     elif method == "boys":
         c = lo.Boys(mol_obj, mo).kernel()
         mo = c
+
     else:
         raise NotImplementedError
     
     return mo
 
-def analyze_weight(mos, mol_obj, w_ao, label_list, tol=1e-3):
-    nao, nmo = mos.shape
-    assert w_ao.shape == (nao, nao)
+def get_ump2_t1(mp2_obj, eris, ignore_t1=True, is_delta_inv=True):
+    fock_a, fock_b = eris.fock
+    nocc_a, nocc_b = eris.nocc
+    norb = fock_a.shape[0]
+    nvir_a = norb - nocc_a
+    nvir_b = norb - nocc_b
 
-    w_mo  = numpy.einsum("mn,mp->np", w_ao, mos)
-    w2_mo = numpy.einsum("np,np->np", w_mo, w_mo)
-    assert w2_mo.shape == (nao, nmo)
+    foo_a = fock_a[:nocc_a, :nocc_a]
+    fvv_a = fock_a[nocc_a:, nocc_a:]
+    fov_a = fock_a[:nocc_a, nocc_a:]
 
-    idx_list = []
-    for label in label_list:
-        idx_list.append(mol_obj.search_ao_label(label))
+    foo_b = fock_b[:nocc_b, :nocc_b]
+    fvv_b = fock_b[nocc_b:, nocc_b:]
+    fov_b = fock_b[:nocc_b, nocc_b:]
 
-    mo_label = []
+    ene_t1 = 0.0
+    t1_a   = numpy.zeros((nocc_a, nvir_a))
+    t1_b   = numpy.zeros((nocc_b, nvir_b))
 
-    label_str = ", ".join(["%8s" % x for x in label_list])
-    # print("LO weight", label_str)
-    for i in range(nmo):
-        assert abs(1.0 - sum(w2_mo[:, i])) < 1e-8
-        lo_w2 = [sum(w2_mo[idx, i]) for idx in idx_list]
-        lo_w2_str = ", ".join(["%8.4f" % x for x in lo_w2])
-        # print("MO %5d: %s" % (i, lo_w2_str))
-        
-        mo_idx = numpy.argmax(lo_w2)
-        mo_label.append((i, label_list[mo_idx], lo_w2[mo_idx]))
+    if not ignore_t1:
+        if is_delta_inv:
+            d_a     = numpy.einsum('ab,ij->aibj', fvv_a, numpy.eye(nocc_a))
+            d_a    -= numpy.einsum('ab,ij->aibj', numpy.eye(nvir_a), foo_a)
+            d_a     = d_a.reshape(nvir_a * nocc_a, nvir_a * nocc_a)
+            d_a_inv = numpy.linalg.inv(d_a).reshape(nvir_a, nocc_a, nvir_a, nocc_a)
 
-    return mo_label
+            d_b     = numpy.einsum('ab,ij->aibj', fvv_b, numpy.eye(nocc_b))
+            d_b    -= numpy.einsum('ab,ij->aibj', numpy.eye(nvir_b), foo_b)
+            d_b     = d_b.reshape(nvir_b * nocc_b, nvir_b * nocc_b)
+            d_b_inv = numpy.linalg.inv(d_b).reshape(nvir_b, nocc_b, nvir_b, nocc_b)
 
-def analyze_weight2(mos, mol_obj, w_ao, label_list, tol=1e-3):
-    nao, nmo = mos.shape
-    assert w_ao.shape == (nao, nao)
+            t1_a = - numpy.einsum('ia,bjai->jb', fov_a, d_a_inv)
+            t1_b = - numpy.einsum('ia,bjai->jb', fov_b, d_b_inv)
 
-    w_mo  = numpy.einsum("mn,mp->np", w_ao, mos)
-    w2_mo = numpy.einsum("np,np->np", w_mo, w_mo)
-    assert w2_mo.shape == (nao, nmo)
+        else:
+            d_a = numpy.diag(fvv_a)[:, None] - numpy.diag(foo_a)[None, :]
+            d_b = numpy.diag(fvv_b)[:, None] - numpy.diag(foo_b)[None, :]
 
-    mo_list  = []
+            t1_a = - fov_a.conj() / d_a.T
+            t1_b = - fov_b.conj() / d_b.T
 
-    for label in label_list:
-        ao_idx = mol_obj.search_ao_label(label)
-        w2_ao  = numpy.einsum("np->p", w2_mo[ao_idx, :])
-        mo_idx = numpy.argsort(w2_ao)[::-1]
+        ene_t1 += numpy.einsum('ia,ia->', fov_a, t1_a)
+        ene_t1 += numpy.einsum('ia,ia->', fov_b, t1_b)
 
-    return mo_label
+    return ene_t1, (t1_a, t1_b)
+
+def get_ump2_t2(mp2_obj, eris, use_iterative_kernel=False):
+    from pyscf.mp.ump2 import kernel
+    from pyscf.mp.mp2  import _iterative_kernel
+
+    if use_iterative_kernel:
+        is_converged, ene_t2, t2 = _iterative_kernel(mp2_obj, eris=eris, verbose=5)
+        assert is_converged
+    else:
+        ene_t2, t2 = kernel(mp2_obj, eris=eris, with_t2=True)
+
+    return ene_t2, t2
 
 def analyze_mo(mos, mol_obj, tol=0.1):
     nao, nmo = mos.shape
@@ -95,70 +113,6 @@ def analyze_mo(mos, mol_obj, tol=0.1):
 
     return mo_label
 
-def pick_bs_orbital(mos, mol_obj, bs_ao_idx=None, tol_bs=0.1, tol_w=0.1, max_bs_orb=6):
-    """
-    Pick the broken symmetry MOs from the given MOs.
-        - calculate the weight of AO on each MO
-        - obatin the AO idx of the given label
-        - calculate the weight of the given AO of MOs on each atom
-        - pick the MOs with broken symmetry character
-
-    Args:
-        mos (numpy.ndarray): MOs
-        mol_obj (pyscf.gto.Mole): molecule object
-        bs_ao_idx (list): list of AO idx
-        tol (float): tolerance for the broken symmetry character
-        max_bs_orb (int): maximum number of broken symmetry MOs
-
-    Returns:
-        mo_list (list): list of broken symmetry MOs
-    """
-    nao, nmo = mos.shape
-    natm = mol_obj.natm
-    
-    ovlp_ao = mol_obj.intor("int1e_ovlp")
-    w_ao    = sqrtm(ovlp_ao)
-    assert w_ao.shape == (nao, nao)
-
-    w_ao_mo  = numpy.einsum("mn,mp->np", w_ao, mos)
-    w2_ao_mo = numpy.einsum("np,np->np", w_ao_mo, w_ao_mo)
-    assert w2_ao_mo.shape == (nao, nmo)
-
-    w2_mo_atm = []
-
-    for iatm, tmp  in enumerate(mol_obj.aoslice_by_atom()):
-        iatm_ao_slice = list(range(tmp[2], tmp[3]))
-
-        ao_idx = []
-        for mu in iatm_ao_slice:
-            if mu in bs_ao_idx:
-                ao_idx.append(mu)
-
-        print("Atom %5d, AO idx: %s" % (iatm, ", ".join([str(x) for x in ao_idx])))
-        
-        tmp = numpy.einsum("np->p", w2_ao_mo[ao_idx, :])
-        w2_mo_atm.append(tmp)
-
-    w2_mo_atm = numpy.array(w2_mo_atm)
-    assert w2_mo_atm.shape == (natm, nmo)
-
-    bs_list = []
-
-    for p in range(nmo):
-        
-        w2_mo_atm_p = w2_mo_atm[:, p]
-        w2_mo_atm_p_max = numpy.max(w2_mo_atm_p)
-        w2_mo_atm_p_min = numpy.min(w2_mo_atm_p)
-        print("MO %5d, w2_mo_atm = %s" % (p, ", ".join(["%8.4f" % x for x in w2_mo_atm_p])))
-
-        if w2_mo_atm_p_max > tol_w and w2_mo_atm_p_max - w2_mo_atm_p_min > tol_bs:
-            bs_list.append(p)
-
-        if len(bs_list) >= max_bs_orb:
-            break
-
-    return bs_list
-
 def solve_n2_rohf(x=1.0, spin=0, basis="ccpvdz"):
     mol = gto.Mole()
     mol.verbose = 0
@@ -171,98 +125,183 @@ def solve_n2_rohf(x=1.0, spin=0, basis="ccpvdz"):
     mol.spin = spin
     mol.build()
 
-    ao_idx = list(range(mol.nao_nr()))
-
-    alph_core_idx = []
-    alph_core_idx += list(mol.search_ao_label("N 1s"))
-    alph_core_idx += list(mol.search_ao_label("N 2s"))
-
-    alph_bs_idx  = []
-    alph_bs_idx += list(mol.search_ao_label("0 N 2p"))
-
-    alph_occ_idx = alph_core_idx + alph_bs_idx
-    alph_vir_idx = list(set(ao_idx) - set(alph_occ_idx))
-
-    beta_core_idx = []
-    beta_core_idx += list(mol.search_ao_label("N 1s"))
-    beta_core_idx += list(mol.search_ao_label("N 2s"))
-
-    beta_bs_idx  = []
-    beta_bs_idx += list(mol.search_ao_label("1 N 2p"))
-
-    beta_occ_idx = beta_core_idx + beta_bs_idx
-    beta_vir_idx = list(set(ao_idx) - set(beta_occ_idx))
-
-    bs_idx = alph_bs_idx + beta_bs_idx
-
+    ao_labels = mol.ao_labels()
+    nelec      = mol.nelec
     nelec_alph = mol.nelec[0]
     nelec_beta = mol.nelec[1]
 
-    assert len(alph_occ_idx) == nelec_alph
-    assert len(beta_occ_idx) == nelec_beta
+    ao_idx = list(range(mol.nao_nr()))
 
-    dm0 = numpy.zeros((2, mol.nao_nr(), mol.nao_nr()))
-    dm0[0,alph_occ_idx,alph_occ_idx] = 1.0
-    dm0[1,beta_occ_idx,beta_occ_idx] = 1.0
+    core_idx = []
+    core_idx += list(mol.search_ao_label("N 1s"))
+    
+    bs_idx  = []
+    bs_idx += list(mol.search_ao_label("N 2s"))
+    bs_idx += list(mol.search_ao_label("N 2p"))
 
     rhf_obj = scf.RHF(mol)
     rhf_obj.kernel(dm0=None)
 
-    uhf_obj = scf.UHF(mol)
-    uhf_obj.kernel(dm0=dm0)
-    # fock_ao_uhf = uhf_obj.get_fock(dm=dm0)
-    # ovlp_ao     = uhf_obj.get_ovlp()
+    # fci_obj = fci.FCI(mol, rhf_obj.mo_coeff)
+    # fci_obj.kernel()
+    # print("FCI energy: %16.8f" % (fci_obj.e_tot - mol.energy_nuc()))
+    # assert 1 == 2
 
-    # mo_energy, mo_coeff = uhf_obj.eig(fock_ao_uhf, ovlp_ao)
-    # mo_occ = uhf_obj.get_occ(mo_energy, mo_coeff)
+    coeff_rhf = rhf_obj.mo_coeff
+    coeff_iao = localize_mo(coeff_rhf, mol_obj=mol, ovlp_ao=mol.intor("int1e_ovlp"), method="iao")
+    nao, nlo  = coeff_iao.shape
+    norb      = nlo
 
-    # print("\n")
-    # print("x = %.2f" % x)
-    # mo_is_uhf_alph = pick_bs_orbital(mo_coeff[0], mol, bs_ao_idx=bs_idx, tol_bs=0.1, tol_w=0.1, max_bs_orb=10)
-    # mo_is_uhf_beta = pick_bs_orbital(mo_coeff[1], mol, bs_ao_idx=bs_idx, tol_bs=0.1, tol_w=0.1, max_bs_orb=10)
+    h1e  = reduce(numpy.dot, (coeff_iao.conj().T, rhf_obj.get_hcore(), coeff_iao))
+    h2e  = ao2mo.kernel(rhf_obj._eri, coeff_iao)
+    ham  = absorb_h1e(h1e, h2e, norb, (nelec_alph, nelec_beta), .5)
 
-    # print("MO is UHF alpha: %s" % ", ".join([str(x) for x in mo_is_uhf_alph]))
-    # print("MO is UHF beta:  %s" % ", ".join([str(x) for x in mo_is_uhf_beta]))
+    ao_label  = mol.ao_labels()
+    ovlp_ao   = rhf_obj.get_ovlp()
+    w_ao      = sqrtm(ovlp_ao)
+    w_ao_iao  = numpy.einsum("mn,mp->np", w_ao, coeff_iao)
+    w2_ao_iao = numpy.einsum("np,np->np", w_ao_iao, w_ao_iao)
 
-    # bs_occ_alph = []
-    # bs_occ_beta = []
+    for p in range(nlo):
+        print("LO %d %s, weight: %6.4f" % (p, ao_label[p], w2_ao_iao[p, p]))
+        assert abs(numpy.sum(w2_ao_iao[:, p]) - 1.0) < 1e-6
+        assert w2_ao_iao[p, p] > 0.5
 
-    # bs_vir_alph = []
-    # bs_vir_beta = []
+    uhf_obj    = scf.UHF(mol)
 
-    # nmo = mo_coeff[0].shape[1]
-    # nao = mo_coeff[0].shape[0]
-    # for p in range(nmo):
-    #     if p in mo_is_uhf_alph and p < nelec_alph:
-    #         bs_occ_alph.append(p)
-    #     elif p in mo_is_uhf_alph and p >= nelec_alph:
-    #         bs_vir_alph.append(p)
+    nelec_core = len(core_idx)
+    bs_ao_idx_alph_list = list(combinations(bs_idx, nelec_alph - nelec_core))
+    bs_ao_idx_beta_list = list(combinations(bs_idx, nelec_beta - nelec_core))
 
-    #     if p in mo_is_uhf_beta and p < nelec_beta:
-    #         bs_occ_beta.append(p)
-    #     elif p in mo_is_uhf_beta and p >= nelec_beta:
-    #         bs_vir_beta.append(p)
+    ene_uhf_list = []
 
-    # coeff_bs_occ_alph = mo_coeff[0][:, bs_occ_alph]
-    # coeff_bs_occ_beta = mo_coeff[1][:, bs_occ_beta]
-    # coeff_bs_vir_alph = mo_coeff[0][:, bs_vir_alph]
-    # coeff_bs_vir_beta = mo_coeff[1][:, bs_vir_beta]
+    for bs_ao_idx_alph in bs_ao_idx_alph_list:
+        for bs_ao_idx_beta in bs_ao_idx_beta_list:
+            bs_ao_idx_alph = list(numpy.sort(bs_ao_idx_alph))
+            bs_ao_idx_beta = list(numpy.sort(bs_ao_idx_beta))
 
-    # print("coeff_bs_occ_alph = ", coeff_bs_occ_alph.shape)
-    # print("coeff_bs_occ_beta = ", coeff_bs_occ_beta.shape)
-    # print("coeff_bs_vir_alph = ", coeff_bs_vir_alph.shape)
-    # print("coeff_bs_vir_beta = ", coeff_bs_vir_beta.shape)
+            # assert bs_ao_idx_alph != [1, 3, 4, 6, 7]
+            # assert bs_ao_idx_beta != [1, 3, 4, 6, 7]
 
-    from pyscf.mcscf import avas
-    avas_obj = avas.AVAS(uhf_obj, ["0 N 2p", "1 N 2p"])
-    norb_act, nelec_act, coeff_ao_mo = avas_obj.kernel()
-    print("norb_act = ", norb_act)
-    print("nelec_act = ", nelec_act)
-    print("coeff_ao_mo = ", coeff_ao_mo.shape)
-    dump_rec(stdout, coeff_ao_mo, mol.ao_labels())
+            vir_ao_idx_alph = list(set(ao_idx) - set(core_idx) - set(bs_ao_idx_alph))
+            vir_ao_idx_beta = list(set(ao_idx) - set(core_idx) - set(bs_ao_idx_beta))
 
-    assert 1 == 2
+            coeff_iao_core     = coeff_iao[:, core_idx]
+            coeff_iao_bs_alph  = coeff_iao[:, bs_ao_idx_alph]
+            coeff_iao_bs_beta  = coeff_iao[:, bs_ao_idx_beta]
+            coeff_iao_vir_alph = coeff_iao[:, vir_ao_idx_alph]
+            coeff_iao_vir_beta = coeff_iao[:, vir_ao_idx_beta]
+
+            assert coeff_iao_core.shape[1]     == nelec_core
+            assert coeff_iao_bs_alph.shape[1]  == nelec_alph - nelec_core
+            assert coeff_iao_bs_beta.shape[1]  == nelec_beta - nelec_core
+            assert coeff_iao_vir_alph.shape[1] == nlo - nelec_alph
+            assert coeff_iao_vir_beta.shape[1] == nlo - nelec_beta
+
+            coeff_iao_occ_alph = numpy.hstack((coeff_iao_core, coeff_iao_bs_alph))
+            coeff_iao_occ_beta = numpy.hstack((coeff_iao_core, coeff_iao_bs_beta))
+            dm_alph = numpy.einsum("pi,qi->pq", coeff_iao_occ_alph, coeff_iao_occ_alph)
+            dm_beta = numpy.einsum("pi,qi->pq", coeff_iao_occ_beta, coeff_iao_occ_beta)
+
+            nocc_alph = coeff_iao_occ_alph.shape[1]
+            nocc_beta = coeff_iao_occ_beta.shape[1]
+            nvir_alph = coeff_iao_vir_alph.shape[1]
+            nvir_beta = coeff_iao_vir_beta.shape[1]
+
+            assert nocc_alph == nelec_alph
+            assert nocc_beta == nelec_beta
+
+            coeff_iao_alph = numpy.hstack((coeff_iao_occ_alph, coeff_iao_vir_alph))
+            coeff_iao_beta = numpy.hstack((coeff_iao_occ_beta, coeff_iao_vir_beta))
+
+            mo_occ_alph = [1] * nocc_alph + [0] * nvir_alph
+            mo_occ_beta = [1] * nocc_beta + [0] * nvir_beta
+
+            coeff_iao_uhf = (coeff_iao_alph, coeff_iao_beta)
+            mo_occ_uhf    = numpy.array((mo_occ_alph, mo_occ_beta))
+            dm_uhf        = (dm_alph, dm_beta)
+
+            from bs import proj_uhf_to_fci_vec, proj_ucisd_to_fci_vec
+            vfci_uhf = proj_uhf_to_fci_vec(coeff_iao, coeff_iao_uhf, nelec, ovlp_ao)
+            v2       = numpy.einsum("ab,ab->", vfci_uhf, vfci_uhf)
+            assert abs(v2 - 1.0) < 1e-6
+
+            ene_uhf     = uhf_obj.energy_elec(dm=dm_uhf, h1e=None, vhf=None)[0]
+            hv          = contract_2e(ham, vfci_uhf, norb, nelec)
+            ene_uhf_ref = numpy.einsum("ab,ab->", hv, vfci_uhf)
+            assert abs(ene_uhf - ene_uhf_ref) < 1e-6
+
+            mp2_obj  = mp.MP2(uhf_obj, mo_coeff=coeff_iao_uhf, mo_occ=mo_occ_uhf)
+            mp2_obj.verbose = 0
+            eris     = mp2_obj.ao2mo()
+
+            fvv_a = eris.fock[0][nocc_alph:, nocc_alph:]
+            fvv_b = eris.fock[1][nocc_beta:, nocc_beta:]
+            foo_a = eris.fock[0][:nocc_alph, :nocc_alph]
+            foo_b = eris.fock[1][:nocc_beta, :nocc_beta]
+            d_a = numpy.diag(fvv_a)[:, None] - numpy.diag(foo_a)[None, :]
+            d_b = numpy.diag(fvv_b)[:, None] - numpy.diag(foo_b)[None, :]
+
+            # print("\nmo_ene occ alph:" + " ".join(["%10.5f" % x for x in numpy.diag(foo_a)]))
+            # print("mo_ene occ beta:" + " ".join(["%10.5f" % x for x in numpy.diag(foo_b)]))
+            # print("mo_ene vir alph:" + " ".join(["%10.5f" % x for x in numpy.diag(fvv_a)]))
+            # print("mo_ene vir beta:" + " ".join(["%10.5f" % x for x in numpy.diag(fvv_b)]))
+
+            if numpy.min(d_a) < 0.0:
+                # print("Warning: fvv_a is not positive definite")
+                continue
+
+            if numpy.min(d_b) < 0.0:
+                # print("Warning: fvv_b is not positive definite")
+                continue
+
+            print("\n")
+            for bs_ao_idx in bs_ao_idx_alph:
+                print("alpha occupied: ao_idx = %d, ao_label = %s" % (bs_ao_idx, ao_labels[bs_ao_idx]))
+
+            for bs_ao_idx in bs_ao_idx_beta:
+                print("beta  occupied: ao_idx = %d, ao_label = %s" % (bs_ao_idx, ao_labels[bs_ao_idx]))
+
+            t0 = 1.0
+            ene_t0 = ene_uhf
+
+            ene_t1_1, t1_1 = get_ump2_t1(mp2_obj, eris, ignore_t1=True,  is_delta_inv=False)
+            ene_t1_2, t1_2 = get_ump2_t1(mp2_obj, eris, ignore_t1=False, is_delta_inv=True)
+            ene_t1_3, t1_3 = get_ump2_t1(mp2_obj, eris, ignore_t1=False, is_delta_inv=False)
+
+            ene_t2_1, t2_1 = get_ump2_t2(mp2_obj, eris, use_iterative_kernel=True)
+            ene_t2_2, t2_2 = get_ump2_t2(mp2_obj, eris, use_iterative_kernel=False)
+
+            assert abs(ene_t2_1 - ene_t2_2) < 1e-6
+            t2     = t2_1
+            ene_t2 = ene_t2_1
+            
+            ene_uhf_list.append(ene_uhf)
+
+            print("UHF energy             = %16.8f" % (ene_uhf))
+            for idx_t1, (ene_t1, t1) in enumerate([(ene_t1_1, t1_1), (ene_t1_2, t1_2), (ene_t1_3, t1_3)]):
+                ene_ump2         = ene_t0 + ene_t2
+                ene_ump2_with_t1 = ene_t0 + ene_t1 + ene_t2
+                
+                vec_ump2  = amplitudes_to_cisdvec(t0, t1, t2)
+                vfci_ump2 = proj_ucisd_to_fci_vec(coeff_iao, coeff_iao_uhf, vec_ump2, nelec, ovlp_ao)
+
+                ene_ump2_ref = numpy.einsum("ab,ab->", hv, vfci_ump2)
+
+                print("idx_t1 = %d" % (idx_t1))
+                print("UMP2 energy             = %16.8f" % ene_ump2)
+                print("UMP2 energy with t1     = %16.8f" % ene_ump2_with_t1)
+                print("UMP2 energy from fcivec = %16.8f" % ene_ump2_ref)
+
+                assert abs(ene_ump2_with_t1 - ene_ump2_ref) < 1e-6
+
+            # assert bs_ao_idx_alph != [1, 3, 4, 6, 7] # or bs_ao_idx_beta != [1, 2, 6, 8, 9]
+
+    print(len(ene_uhf_list))
+    print(numpy.min(ene_uhf_list))
 
 if __name__ == "__main__":
     for x in numpy.arange(0.4, 3.0, 0.1):
+        x = 0.7
         solve_n2_rohf(x=x, spin=0, basis="sto3g")
+        assert 1 == 2

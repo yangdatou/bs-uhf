@@ -61,32 +61,30 @@ def ucisd_guess(ucisd_obj, eris=None):
     mo_ea, mo_eb = eris.mo_energy
     eia_a = mo_ea[:nocca,None] - mo_ea[None,nocca:]
     eia_b = mo_eb[:noccb,None] - mo_eb[None,noccb:]
+
+    norb_a  = ucisd_obj.nmo[0]
+    norb_b  = ucisd_obj.nmo[1]
+    assert norb_a == norb_b
+    norb    = norb_a
+
+    nvira   = norb - nocca
+    nvirb   = norb - noccb
+    fvv_a   = eris.focka[nocca:,nocca:]
+    fvv_b   = eris.fockb[noccb:,noccb:]
+    foo_a   = eris.focka[:nocca,:nocca]
+    foo_b   = eris.fockb[:noccb,:noccb]
+
+    # This shall be inv(f_ab - f_ij)
     t1a = eris.focka[:nocca,nocca:].conj() / eia_a
     t1b = eris.fockb[:noccb,noccb:].conj() / eia_b
 
-    eris_ovov = _cp(eris.ovov)
-    eris_ovOV = _cp(eris.ovOV)
-    eris_OVOV = _cp(eris.OVOV)
-    t2aa = eris_ovov.transpose(0,2,1,3) - eris_ovov.transpose(0,2,3,1)
-    t2bb = eris_OVOV.transpose(0,2,1,3) - eris_OVOV.transpose(0,2,3,1)
-    t2ab = eris_ovOV.transpose(0,2,1,3).copy()
-    t2aa = t2aa.conj()
-    t2ab = t2ab.conj()
-    t2bb = t2bb.conj()
-    t2aa /= lib.direct_sum('ia+jb->ijab', eia_a, eia_a)
-    t2ab /= lib.direct_sum('ia+jb->ijab', eia_a, eia_b)
-    t2bb /= lib.direct_sum('ia+jb->ijab', eia_b, eia_b)
+    mp2_obj = mp.MP2(ucisd_obj._scf)
+    ucisd_obj._scf.converged = False
+    mp2_obj.kernel()
+    emp2 = mp2_obj.e_corr
+    t2aa, t2ab, t2bb = mp2_obj.t2
 
-    emp2  = numpy.einsum('iajb,ijab', eris_ovov, t2aa) * .25
-    emp2 -= numpy.einsum('jaib,ijab', eris_ovov, t2aa) * .25
-    emp2 += numpy.einsum('iajb,ijab', eris_OVOV, t2bb) * .25
-    emp2 -= numpy.einsum('jaib,ijab', eris_OVOV, t2bb) * .25
-    emp2 += numpy.einsum('iajb,ijab', eris_ovOV, t2ab)
-    emp2 += numpy.einsum('ia,ia', t1a, eris.focka[:nocca,nocca:])
-    emp2 += numpy.einsum('ia,ia', t1b, eris.fockb[:noccb,noccb:])
-    ucisd_obj.emp2 = emp2.real
-
-    ci_guess = ucisd.amplitudes_to_cisdvec(1, (t1a,t1b), (t2aa,t2ab,t2bb))
+    ci_guess = ucisd.amplitudes_to_cisdvec(1.0, (t1a, t1b), (t2aa, t2ab, t2bb))
 
     return emp2, ci_guess
 
@@ -117,7 +115,7 @@ def get_uhf_vfci(coeff_rhf=None, coeff_uhf=None, mo_occ_uhf=None, ovlp_ao=None, 
     nelec_alph  = nelec[0]
     nelec_beta  = nelec[1]
 
-    uhf_obj.reset()
+    # uhf_obj.reset()
     uhf_obj.mo_occ   = mo_occ_uhf
     uhf_obj.mo_coeff = coeff_uhf
     dm_uhf  = uhf_obj.make_rdm1(coeff_uhf, mo_occ_uhf)
@@ -187,6 +185,9 @@ def solve_uhf_noci(v_bs_uhf_list, hv_bs_uhf_list, ene_bs_uhf_list, tol=1e-8):
     if not ene_err < tol:
         print("Warning: diagonal elements of v_uhf_dot_hv_ump2 is not ene_ump2_list")
         print(f"ene_err = {ene_err : 12.8e}")
+
+        print("ene_ump2_list = ", ene_bs_uhf_list)
+        print("diag(v_uhf_dot_hv_ump2) = ", numpy.diag(v_dot_hv))
 
     ene_noci, vfci_noci = solve_variational_noci(v_bs_uhf_list, hv_bs_uhf_list, tol=tol)
     return ene_noci, vfci_noci
