@@ -7,6 +7,9 @@ from itertools import combinations
 from pyscf import gto, scf, mp, ci
 from pyscf import lo, fci, ao2mo
 from pyscf.lib import chkfile
+from pyscf.tools import dump_mat
+print_mat = lambda x, t: (print(t), dump_mat.dump_rec(sys.stdout, x))
+
 from pyscf.fci.spin_op import spin_square
 from pyscf.fci.direct_spin1 import absorb_h1e
 from pyscf.fci.direct_spin1 import contract_2e
@@ -114,6 +117,11 @@ def solve_h4_bs_noci(x, basis="sto3g"):
         dm_bs_list.append(dm_uhf)
 
         coeff_uhf  = uhf_obj.mo_coeff
+        ca_o = coeff_uhf[0] # [:, :nelec_alph]
+        cb_o = coeff_uhf[1] # [:, :nelec_beta]
+        s_ab = reduce(numpy.dot, (ca_o.conj().T, ovlp_ao, cb_o))
+        print_mat(s_ab, f"Overlap between alpha and beta orbitals (basis {ibs})")
+
         mo_occ_uhf = uhf_obj.mo_occ
         args = (coeff_ao_lo, coeff_uhf, mo_occ_uhf, ovlp_ao, uhf_obj)
 
@@ -184,7 +192,9 @@ def solve_h4_bs_noci(x, basis="sto3g"):
     assert hv_bs_uhf.shape  == (nbs, ndeta, ndetb)
     assert ene_bs_uhf.shape == (nbs,)
 
-    ene_noci_uhf, v_noci_uhf  = solve_uhf_noci(*args, tol=1e-8)
+    tmp = solve_uhf_noci(*args, tol=1e-8)
+    ene_noci_uhf  = tmp[0]
+    v_noci_uhf    = tmp[1]
     data_dict["v-noci-uhf"]   = 0 # v_noci_uhf
     data_dict["ene-noci-uhf"] = ene_noci_uhf
     data_dict["s2-noci-uhf"]  = get_s2(v_noci_uhf)
@@ -207,12 +217,16 @@ def solve_h4_bs_noci(x, basis="sto3g"):
         assert hv_bs.shape  == (nbs, ndeta, ndetb)
         assert ene_bs.shape == (nbs,)
 
-        ene_noci_1, v_noci_1 = func_dict[f"noci-{m}"](*args, tol=1e-4, method=1, ref=None)
+        tmp = func_dict[f"noci-{m}"](*args, tol=1e-4, method=1, ref=None)
+        ene_noci_1 = tmp[0]
+        v_noci_1   = tmp[1]
         data_dict[f"v-noci-{m}-1"]     = 0 # v_noci_1
         data_dict[f"ene-noci-{m}-1"]   = ene_noci_1
         data_dict[f"s2-noci-{m}-1"]    = get_s2(v_noci_1)
 
-        ene_noci_2, v_noci_2 = func_dict[f"noci-{m}"](*args, tol=1e-4, method=2, ref=None)
+        tmp = func_dict[f"noci-{m}"](*args, tol=1e-4, method=2, ref=None)
+        ene_noci_2 = tmp[0]
+        v_noci_2   = tmp[1]
         data_dict[f"v-noci-{m}-2"]     = 0 # v_noci_2
         data_dict[f"ene-noci-{m}-2"]   = ene_noci_2
         data_dict[f"s2-noci-{m}-2"]    = get_s2(v_noci_2)
@@ -228,11 +242,11 @@ if __name__ == "__main__":
     tmp_dir  = dir_path + f"/{m}-{basis}/"
     h5_path  = os.path.join(dir_path, f"{m}-{basis}.h5")
 
-    if not os.path.exists(tmp_dir):
-        os.makedirs(tmp_dir, exist_ok=True)
+    # if not os.path.exists(tmp_dir):
+    #     os.makedirs(tmp_dir, exist_ok=True)
 
-    if os.path.exists(h5_path):
-        os.remove(h5_path)
+    # if os.path.exists(h5_path):
+    #     os.remove(h5_path)
 
     print("\n")
     print("#" * 20)
@@ -244,26 +258,27 @@ if __name__ == "__main__":
 
     for x in numpy.linspace(0.5, 1.5, 41):
         data_dict = solve_h4_bs_noci(x, basis=basis)
-        chkfile.save(h5_path, "%.8f" % x, data_dict)
+        assert 1 == 2
+        # chkfile.save(h5_path, "%.8f" % x, data_dict)
 
-    basis    = "cc-pvdz"
-    tmp_dir  = dir_path + f"/{m}-{basis}/"
-    h5_path  = os.path.join(dir_path, f"{m}-{basis}.h5")
+    # basis    = "cc-pvdz"
+    # tmp_dir  = dir_path + f"/{m}-{basis}/"
+    # h5_path  = os.path.join(dir_path, f"{m}-{basis}.h5")
 
-    if not os.path.exists(tmp_dir):
-        os.makedirs(tmp_dir, exist_ok=True)
+    # if not os.path.exists(tmp_dir):
+    #     os.makedirs(tmp_dir, exist_ok=True)
 
-    if os.path.exists(h5_path):
-        os.remove(h5_path)
+    # if os.path.exists(h5_path):
+    #     os.remove(h5_path)
 
-    print("\n")
-    print("#" * 20)
-    print("m        = %s" % m)
-    print("basis    = %s" % basis)
-    print("dir_path = %s" % dir_path)
-    print("tmp_dir  = %s" % tmp_dir)
-    print("h5_path  = %s" % h5_path)
+    # print("\n")
+    # print("#" * 20)
+    # print("m        = %s" % m)
+    # print("basis    = %s" % basis)
+    # print("dir_path = %s" % dir_path)
+    # print("tmp_dir  = %s" % tmp_dir)
+    # print("h5_path  = %s" % h5_path)
 
-    for x in numpy.linspace(0.4, 1.5, 41):
-        data_dict = solve_h4_bs_noci(x, basis=basis)
-        chkfile.save(h5_path, "%.8f" % x, data_dict)
+    # for x in numpy.linspace(0.4, 1.5, 41):
+    #     data_dict = solve_h4_bs_noci(x, basis=basis)
+    #     chkfile.save(h5_path, "%.8f" % x, data_dict)

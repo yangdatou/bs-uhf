@@ -134,9 +134,9 @@ def solve_n2_rohf(x=1.0, spin=0, basis="ccpvdz"):
 
     core_idx = []
     core_idx += list(mol.search_ao_label("N 1s"))
+    core_idx += list(mol.search_ao_label("N 2s"))
     
     bs_idx  = []
-    bs_idx += list(mol.search_ao_label("N 2s"))
     bs_idx += list(mol.search_ao_label("N 2p"))
 
     rhf_obj = scf.RHF(mol)
