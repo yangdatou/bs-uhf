@@ -113,6 +113,79 @@ def analyze_mo(mos, mol_obj, tol=0.1):
 
     return mo_label
 
+def bs_uhf_n2_uno(x=1.0, spin=0, basis="ccpvdz"):
+    mol = gto.Mole()
+    mol.verbose = 0
+    # mol.output = './tmp/n2-bs-uhf-%.2f.out' % x
+    mol.atom = f"""
+        N 0.00000 0.00000 0.00000
+        N 0.00000 0.00000 {x:12.8f}
+    """ 
+    mol.basis = basis
+    mol.spin = spin
+    mol.build()
+
+    ao_labels = mol.ao_labels()
+    nelec      = mol.nelec
+    nelec_alph = mol.nelec[0]
+    nelec_beta = mol.nelec[1]
+
+    ao_idx = list(range(mol.nao_nr()))
+    nao = len(ao_idx)
+
+    core_idx   = []
+    core_idx  += list(mol.search_ao_label("N 1s"))
+    core_idx  += list(mol.search_ao_label("N 2s"))
+    norb_core  = len(core_idx)
+    
+    bs_idx     = []
+    bs_idx    += list(mol.search_ao_label("N 2p"))
+
+    
+    bs_ao_idx_alph_list = list(combinations(bs_idx, nelec_alph - norb_core))
+
+    ene_uhf_list = []
+
+    bs_ao_idx_alph = list(mol.search_ao_label("0 N 2p"))
+    bs_ao_idx_beta = list(mol.search_ao_label("1 N 2p"))
+
+    print("bs_ao_idx_alph = ", bs_ao_idx_alph)
+    print("bs_ao_idx_beta = ", bs_ao_idx_beta)
+
+    dm0 = numpy.zeros((2, nao, nao))
+    dm0[0, core_idx, core_idx] = 1.0
+    dm0[1, core_idx, core_idx] = 1.0
+    dm0[0, bs_ao_idx_alph, bs_ao_idx_alph] = 1.0
+    dm0[1, bs_ao_idx_beta, bs_ao_idx_beta] = 1.0
+
+    mf = scf.UHF(mol)
+    mf.verbose = 4
+    mf.kernel(dm0=dm0)
+
+    coeff_alph = mf.mo_coeff[0] # [:, :nelec_alph]
+    coeff_beta = mf.mo_coeff[1] # [:, :nelec_beta]
+    coeff_alph_occ = coeff_alph[:, :nelec_alph]
+    coeff_beta_occ  = coeff_beta[:, :nelec_beta]
+
+    ovlp_ab = reduce(numpy.dot, (coeff_alph.T, mf.get_ovlp(), coeff_beta))
+    print("ovlp_ab = ")
+    dump_rec(stdout, ovlp_ab, label=mol.ao_labels(), ncol=7)
+
+    ovlp_ab_occ = reduce(numpy.dot, (coeff_alph_occ.T, mf.get_ovlp(), coeff_beta_occ))
+    print("ovlp_ab_occ = ")
+    dump_rec(stdout, ovlp_ab_occ, label=mol.ao_labels(), ncol=7)
+
+    dm_uhf = mf.make_rdm1()
+    dm     = dm_uhf[0] + dm_uhf[1]
+    dm = reduce(numpy.dot, (coeff_alph.T, mf.get_ovlp(), dm, mf.get_ovlp(), coeff_alph))
+    print("dm = ")
+    dump_rec(stdout, dm, label=mol.ao_labels(), ncol=7)
+
+    u, s, vh = scipy.linalg.svd(dm_tot)
+    print("s = ", ", ".join(["%6.4f" % x for x in s]))
+
+ 
+
 def solve_n2_rohf(x=1.0, spin=0, basis="ccpvdz"):
     mol = gto.Mole()
     mol.verbose = 0
@@ -302,6 +375,6 @@ def solve_n2_rohf(x=1.0, spin=0, basis="ccpvdz"):
 
 if __name__ == "__main__":
     for x in numpy.arange(0.4, 3.0, 0.1):
-        x = 0.7
-        solve_n2_rohf(x=x, spin=0, basis="sto3g")
+        x = 4.0
+        bs_uhf_n2_uno(x=x, spin=0, basis="sto3g")
         assert 1 == 2
